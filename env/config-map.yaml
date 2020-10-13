@@ -1,0 +1,12 @@
+apiVersion: v1 
+kind: ConfigMap
+metadata: 
+  name: cron-script-cf
+  labels:
+    app: #some appname
+  data: 
+    run.sh: |
+      #!/bin/sh insert shell script here
+
+      mkdir temp 
+      cd temp

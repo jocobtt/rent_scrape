@@ -1,0 +1,17 @@
+import pytest
+import helpers.helpers as utils
+from selenium import webdriver 
+from selenium.webdriver.common.key import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
+
+# 
+
+def submit_link(driver):
+	driver.find_element(By.XPATH, "//input[@type='submit']").click()
+
+# 
+
+# tear it all down 
+def test_tear(driver):
+	driver.quit()

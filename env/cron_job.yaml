@@ -1,0 +1,30 @@
+# https://cloud.google.com/appengine/docs/standard/python/config/cronref
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: scrape-run
+  namespace: scrapez
+spec:
+  schedule: "*/1 * * * *"
+  jobTemplate: 
+    spec:
+      template:
+        spec:
+          containers:
+            - name: scrape-run
+              image: alpine:3
+              imagePullPolicy: IfNotPresent
+              command: [ "/bin/sh"]
+              args: [ "/var/script.sh" ]
+              volumeMounts: 
+              - name: script
+                mountPath: "/var/"
+            volumes: 
+            - name: script
+              configMap: 
+                name: cron-script
+                defaultMode: 0777
+            restartPolicy: OnFailure
+            terminationGracePeriodSeconds: 0
+
+    concurrencyPolicy: Replace 
