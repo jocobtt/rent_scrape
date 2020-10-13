@@ -7,7 +7,7 @@ import googlemaps
 
 print("beginning googlemaps loop/function for time to get to work")
 # get time of to get to work via transit from potential apartment's nearest station via the googlemaps python api https://github.com/googlemaps/google-maps-services-python
-gmaps = googlemaps.Client(key="AIzaSyDYqNB66cvNTfKFhQMnAiz8-40PVI95C_s")
+gmaps = googlemaps.Client(key=)
 # should this instead be a function? 
 
 # try this as a function - still need to figure out what is wrong with getting transit info - will probably have to instead get info from eki to work instead 
