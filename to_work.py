@@ -70,7 +70,7 @@ df['Lon'] = None
 
 for i in range(len(df)):
 	geocode_ = gmaps.geocode(df.loc[i, 'address'])
-	try 
+	try: 
 	lat = geocode_[0]['geometry']['location']['lat']
 	lng = geocode_[0]['geometry']['location']['lng']
 	df.loc[1,'Lat'] = lat

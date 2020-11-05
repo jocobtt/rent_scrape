@@ -30,7 +30,7 @@ class AddressResult:
     advid: Optional[str]
 
     @classmethod
-    def from_re_match(cls, match: re.Match) -> "AddressResult":
+    def from_re_match(cls, match: re.match) -> "AddressResult":
         args = list(eval(match[1].replace("null", "None")))
         args += [None] * (12 - len(args))
         return cls(*args)
