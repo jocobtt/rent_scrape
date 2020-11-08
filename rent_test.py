@@ -7,8 +7,8 @@ from time import sleep
 import googlemaps
 
 # this has all of the ku's I want - so use this instead of multiple URLs
-URL = "https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=030&bs=040&pc=50&smk=&po1=25&po2=99&shkr1=03&shkr2=03&shkr3=03&shkr4=03&sc=13101&sc=13102&sc=13103&sc=13104&sc=13105&sc=13113&sc=13106&sc=13107&sc=13108&sc=13118&sc=13109&sc=13110&sc=13111&sc=13112&sc=13114&sc=13115&sc=13116&ta=13&cb=0.0&ct=9999999&md=02&md=03&md=04&md=05&md=06&et=9999999&mb=0&mt=9999999&cn=9999999&tc=0400301&fw2="
-# Osaka URL - https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=060&bs=040&ta=27&sc=27102&sc=27115&sc=27118&sc=27124&sc=27127&cb=0.0&ct=9999999&co=3&et=15&md=02&md=03&md=05&md=06&ts=1&cn=25&mb=0&mt=9999999&tc=0400501&tc=0400601&tc=0400301&shkr1=03&shkr2=03&shkr3=03&shkr4=03&fw2=
+# tokyo URL = "https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=030&bs=040&pc=50&smk=&po1=25&po2=99&shkr1=03&shkr2=03&shkr3=03&shkr4=03&sc=13101&sc=13102&sc=13103&sc=13104&sc=13105&sc=13113&sc=13106&sc=13107&sc=13108&sc=13118&sc=13109&sc=13110&sc=13111&sc=13112&sc=13114&sc=13115&sc=13116&ta=13&cb=0.0&ct=9999999&md=02&md=03&md=04&md=05&md=06&et=9999999&mb=0&mt=9999999&cn=9999999&tc=0400301&fw2="
+URL = "https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=060&bs=040&ta=27&sc=27102&sc=27115&sc=27118&sc=27124&sc=27127&cb=0.0&ct=9999999&co=3&et=15&md=02&md=03&md=05&md=06&ts=1&cn=25&mb=0&mt=9999999&tc=0400501&tc=0400601&tc=0400301&shkr1=03&shkr2=03&shkr3=03&shkr4=03&fw2="
 
 ########################################
 ####      final code solution       ####
@@ -41,7 +41,7 @@ headers = {
 }
 s.headers.update(headers)
 
-pages = np.arange(11,25,1) # first test out on 100 then go from there 
+pages = np.arange(1,10,1) # first test out on 100 then go from there 
 for page in pages:
 	page = requests.get(URL + str(pages) + "&ref_=adv_nxt", headers=headers)
 	soup = BeautifulSoup(page.text, 'html.parser')
@@ -100,27 +100,24 @@ df_ = pd.DataFrame({'rent_price': rent_price,
 	'house_type': house_type})
 
 print("Now creating Lat and Lon variables")
-# add geo code info 
+# add geo code info - need to just scrape this from navitime instead 
 df_['Lat'] = None
 df_['Lon'] = None
 
-gmaps = googlemaps.Client(key="")
-if len(address) > 10000:
-	for i in range(len(df)):
-		geocode_ = gmaps.geocode(df.loc[i, 'address'])
-	try:
-		lat = geocode_[0]['geometry']['location']['lat']
-		lng = geocode_[0]['geometry']['location']['lng']
-		df_.loc[1,'Lat'] = lat
-		df_.loc[1,'Lon'] = lng 
-	except:
-		lat = None
-		lng = None
-else:
-	print('Too many addresses to pull') 
+#for i in range(len(df)):
+#	geocode_ = gmaps.geocode(df.loc[i, 'address'])
+#try:
+#	lat = geocode_[0]['geometry']['location']['lat']
+#	lng = geocode_[0]['geometry']['location']['lng']
+##	df_.loc[1,'Lon'] = lng 
+#except:
+#	lat = None
+#	lng = None
 
 # os.chdir('~/Downloads/') -- don't need this yet
 # save as csv
-df_.to_csv('tokyo_2.csv', index=False)
+df_.to_csv('osaka.csv', index=False)
 
 print("All done! Go checkout tokyo.csv file now and run model and data cleaning file!")
+
+
