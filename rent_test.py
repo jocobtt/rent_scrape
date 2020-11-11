@@ -41,7 +41,7 @@ headers = {
 }
 s.headers.update(headers)
 
-pages = np.arange(1,10,1) # first test out on 100 then go from there 
+pages = np.arange(31,41,1) # first test out on 100 then go from there 
 for page in pages:
 	page = requests.get(URL + str(pages) + "&ref_=adv_nxt", headers=headers)
 	soup = BeautifulSoup(page.text, 'html.parser')
@@ -114,9 +114,9 @@ df_['Lon'] = None
 #	lat = None
 #	lng = None
 
-# os.chdir('~/Downloads/') -- don't need this yet
+os.chdir('/Users/jabras/rent_scrape/data') 
 # save as csv
-df_.to_csv('osaka.csv', index=False)
+df_.to_csv('osaka_4.csv', index=False)
 
 print("All done! Go checkout tokyo.csv file now and run model and data cleaning file!")
 

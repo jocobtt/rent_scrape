@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql 
+spec: 
+  ports: 
+  - port: 3306
+  selector:
+    app: mysql
+  clusterIP: None
+---
+# https://kubernetes.io/docs/tasks/run-application/run-single-instance-stateful-application/

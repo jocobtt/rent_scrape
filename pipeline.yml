@@ -1,0 +1,9 @@
+name: rent-pipe
+on: [push]
+jobs:
+  myjob:
+    runs-on: python-latest 
+    steps: 
+    - uses: action/checkout@v2
+    - name: Run scraper 
+      run: python3 rent_script.py
