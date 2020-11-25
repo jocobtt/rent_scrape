@@ -10,6 +10,8 @@ import googlemaps
 df = pd.read_csv('tokyo.csv')   # don't hard code this - make function to read in all csv files in directory
 
 def clean_data(folder=".", dataname="tokyo_main.csv"):
+	os.chdir('~/Users/jabras/rent_scrape/data/')
+	path = os.getcwd()
 	
 	files = [f for f in os.listdir(folder) if os.path.isfile(f)]
 	
@@ -21,6 +23,17 @@ def clean_data(folder=".", dataname="tokyo_main.csv"):
 			read = pd.read_csv(f)
 			merged.appen(read)
 	result = pd.concat(merged, axis = 0)
+
+	path = os.getcwd()
+	all_files = os.listdir(path)
+	li = []
+
+	for filename in all_files:
+    	df = pd.read_csv(filename, index_col=None, header=0)
+    	li.append(df)
+	frame = pd.concat(li, axis=0, ignore_index=True)
+
+# need to adjust/test above a bit. It needs to be able to read in from a directory and then output the results. Right now it doesn't work as needed. 
 
 
 	# now clean result
