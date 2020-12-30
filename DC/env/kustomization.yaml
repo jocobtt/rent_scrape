@@ -1,0 +1,7 @@
+apiVersion: kustomization.config.k8s.io/v1
+kind: Kustomization
+namespace: dc_scrape
+resources:
+- scrape.yaml
+- analysis.yaml 
+- cron-job.yaml

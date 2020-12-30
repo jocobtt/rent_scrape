@@ -3,3 +3,4 @@ numpy==1.19.0
 arrow==0.8.0
 beautifulsoup4==4.9.1
 requests==2.24.0
+mechanize==0.4.5

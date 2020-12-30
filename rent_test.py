@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 import numpy as np 
 import os 
 from time import sleep
-import googlemaps
 
 # this has all of the ku's I want - so use this instead of multiple URLs
 # tokyo URL = "https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=030&bs=040&pc=50&smk=&po1=25&po2=99&shkr1=03&shkr2=03&shkr3=03&shkr4=03&sc=13101&sc=13102&sc=13103&sc=13104&sc=13105&sc=13113&sc=13106&sc=13107&sc=13108&sc=13118&sc=13109&sc=13110&sc=13111&sc=13112&sc=13114&sc=13115&sc=13116&ta=13&cb=0.0&ct=9999999&md=02&md=03&md=04&md=05&md=06&et=9999999&mb=0&mt=9999999&cn=9999999&tc=0400301&fw2="
@@ -99,10 +98,24 @@ df_ = pd.DataFrame({'rent_price': rent_price,
 	'floor' : floor,
 	'house_type': house_type})
 
+
+	# return destination box, start_box & time to leave 
+
 print("Now creating Lat and Lon variables")
 # add geo code info - need to just scrape this from navitime instead 
 df_['Lat'] = None
 df_['Lon'] = None
+df_['bike_time'] = None
+df_['bike_dist'] = None
+df_['bike_cal'] = None
+df_['commute_time'] = None
+df_['commute_changes'] = None
+
+# start loop to pull info we need/want
+for i in address:
+	
+
+
 
 #for i in range(len(df)):
 #	geocode_ = gmaps.geocode(df.loc[i, 'address'])

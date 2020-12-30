@@ -10,5 +10,5 @@ COPY . .
 
 #RUN pip3 install -r requirements.txt
 # need to fix this - getting weird error about pip install not working 
-RUN pip3 install pandas && pip3 install bs4 && pip3 install requests
+RUN pip3 install pandas && pip3 install bs4 && pip3 install requests && pip3 install mechanize 
 

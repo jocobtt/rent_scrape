@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup
 import numpy as np 
 import os 
 from time import sleep
-import googlemaps
 from datetime import datetime
 
 # this has all of the ku's I want - so use this instead of multiple URLs
@@ -143,7 +142,7 @@ print("All done! Go checkout apartment.csv file now and run model and data clean
 
 
 # making this all a function now 
-def rent_get(sumo_url, scrape_from, scrape_to, interval, wait_time_min, wait_time_max, directory):
+def rent_get(sumo_url, scrape_from, scrape_to, interval, wait_time_min, wait_time_max, directory, data_set):
 	# print off that it is starting the loop 
 	print("Starting Loop...")
 
@@ -212,15 +211,6 @@ def rent_get(sumo_url, scrape_from, scrape_to, interval, wait_time_min, wait_tim
 	# print that main loop is now finished 
 	print("Main scraping loop finished. Now pulling geocode information")
 
-	
-
-	if len(address) > 1000:
-		for addresse in address:
-		geo_code = gmaps.geocode(addresse)
-		geo_code = geo_code[0]["geometry"]["location"]
-
-	else:
-		print('Too many addresses to pull') 
 
 
 	# save to data frame
@@ -242,7 +232,6 @@ def rent_get(sumo_url, scrape_from, scrape_to, interval, wait_time_min, wait_tim
 	df_['Lat'] = None
 	df_['Lon'] = None
 
-	gmaps = googlemaps.Client(key="my-keyfile")
 	if len(address) > 10000:
 		for i in range(len(df)):
 			geocode_ = gmaps.geocode(df.loc[i, 'address'])
@@ -257,9 +246,9 @@ def rent_get(sumo_url, scrape_from, scrape_to, interval, wait_time_min, wait_tim
 	else:
 		print('Too many addresses to pull') 
 
-	# os.chdir(directory) -- don't need this yet
+	os.chdir(directory)
 	# save as csv
-	df_.to_csv('tokyo.csv', index=False)
+	df_.to_csv(data_set, index=False)
 
-	print("All done! Go checkout apartment.csv file now and run model and data cleaning file!")
+	print("All done! Go checkout file now and run model and data cleaning file!")
 
