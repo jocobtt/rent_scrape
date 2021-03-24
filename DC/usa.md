@@ -1,8 +1,13 @@
-Use zillow to try and scrape apartment listings in us
+Use zillow and other sources to try and scrape apartment/condos listings in us
+
+apartments.com, https://www.northernvirginiahomepro.com/northern-virginia-condos/ 
+
+https://www.redfin.com/
+
+
 
 https://github.com/seme0021/python-zillow
 
-zillow api - X1-ZWz1i4g6dd8miz_8tgid
 
 https://www.kaggle.com/christophercorrea/preparing-the-d-c-real-property-dataset
 
