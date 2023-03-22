@@ -1,8 +1,16 @@
 <template>
-  <div ref="chart"></div>
+  <div ref="chart">
+    <svg ref="svgRef">
+      <g class="x-axis" />
+      <g class="y-axis" />  
+  </div>
 </template>
+
 <script>
-import * as d3 from 'd3'
+import { onMounted, ref, watchEffect } from "vue";
+
+import * as d3 from 'd3';
+import useResizeObserver from "../use/resizeObserver";
 
 export default {
   mounted() {

@@ -12,22 +12,22 @@
       </div>
       <div class="model__content__right">
         <div class="model__content__right__input">
-          <h2>Input rent price here</h2>
-          <label for="field1">Rent Price: </label>
-            <input type="text" v-model="field1" class="form-control"/>
-            <label for="field2">Number of Bedrooms: </label>
-            <input type="text" v-model="field2" class="form-control"/>
-            <label for="field3">Number of Bathrooms: </label>
-            <input type="text" v-model="field3" class="form-control"/>
+          <h2>Input apartment parameters here</h2>
+          <label for="sqrM">Square Meters: </label>
+            <input type="text" v-model="sqrM" class="form-control"/>
+            <label for="ApartmentType">Apartment Type: </label>
+            <input type="text" v-model="ApartmentType" class="form-control"/>
+            <label for="KuName">Ku name: </label>
+            <input type="text" v-model="KuName" class="form-control"/>
         </div>
         <div class="model__content__right__price">
-          <p>$3</p>
+          <p>Model disclaimer/reminder goes here</p>
         </div>
         <div class="model__content__right__button">
           <button type ="calculate" class = "btn btn-success btn-block mt-3">Calculate Rent!</button>
         </div>
-        <div class="model__content__right__description">
-          <p>test description</p>
+        <div v-if="rentPrice" class="rentPrice">
+          <p>Your estimated rent is: {{rentPrice}}</p>
         </div>
       </div>
     </div>
@@ -36,14 +36,32 @@
 </template>
 
 <script>
+// make axios api call 
+import axios from 'axios';
 export default {
     name: "Model",
     data() {
     return {
-        field1: "",
-        field2: "",
-        field3: "",
-        image: require("../assets/model.png"),
+        sqrM: "",
+        ApartmentType: "",
+        KuName: "",
+        rentPrice: "",
     };
+  },
+    methods: {
+      async callModel() {
+        try {
+          const response = await axios.get('http://localhost:5000/predict', {
+            params: {
+              sqrM: this.sqrM,
+              ApartmentType: this.ApartmentType,
+              KuName: this.KuName,
+            }
+          });
+          this.rentPrice = response.data;
+        } catch (error) {
+          console.log(error);
+        }
     }
+  },
 };
