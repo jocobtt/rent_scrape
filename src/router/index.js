@@ -1,17 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import Home from '../views/Home.vue';
-import Viz from '../views/Viz.vue';
-import Model from '../views/Model.vue';
+
 const routes = [
-    {
-      path: '/',
-      name: 'Home',
-      component: Home
-    },
     {
       path: '/home',
       name: 'Home',
-        component: Home,
+        component: () => import('../views/Home.vue'),
         meta: {
             title: 'Home'
         }
@@ -19,7 +12,7 @@ const routes = [
     {
       path: '/Viz',
       name: 'Viz',
-      component: Viz,
+      component: () => import('../views/Viz.vue'),
       meta: {
         title: 'Viz'
       }
@@ -27,15 +20,31 @@ const routes = [
     {
       path: '/model',
       name: 'Model',
-      component: Model,
+      component: () => import('../views/Model.vue'),
       meta: {
         title: 'Model'
+      }
+    },
+    {
+      path: '/about',
+      name: 'About',
+      component: () => import('../views/About.vue'),
+      meta: {
+        title: 'About'
+      }
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      component: () => import('../views/NotFound.vue'),
+      meta: {
+        title: '404'
       }
     }
   ];
   
 const router = createRouter({
-    history: createWebHistory(process.env.BASE_URL),
+    history: createWebHistory(),
     routes
 });
   
