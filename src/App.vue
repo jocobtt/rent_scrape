@@ -7,15 +7,19 @@
       <button @click="filterData">Filter data</button>
     </div>
   </div>
+  <div>  <Footer /> </div>
+
 </template>
 
 <script>
 import ResponsiveLineChart from "./components/ResponsiveLineChart.vue";
+import Footer from "./components/FooterApp.vue";
 // import { data } from "./assets/data.csv";
 export default {
   name: "App",
   components: {
     ResponsiveLineChart,
+    Footer,
   },
   data() {
     return {

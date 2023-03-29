@@ -56,6 +56,7 @@ export default {
               sqrM: this.sqrM,
               ApartmentType: this.ApartmentType,
               KuName: this.KuName,
+              // will have more inputs here
             }
           });
           this.rentPrice = response.data;
@@ -65,3 +66,4 @@ export default {
     }
   },
 };
+</script>
