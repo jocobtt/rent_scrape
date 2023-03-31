@@ -1,39 +1,22 @@
 <template>
+  <div class="container">
+    <NavBar />
+  </div>
   <div id="app">
-    <h1>🗼Tokyo Apartment Data</h1>
-    <responsive-line-chart :data="data" />
-    <div class="buttons">
-      <button @click="addData">Visualize Data!</button>
-      <button @click="filterData">Filter data</button>
-    </div>
+    <routerView></routerView>
   </div>
   <div>  <Footer /> </div>
 
 </template>
 
 <script>
-import ResponsiveLineChart from "./components/ResponsiveLineChart.vue";
 import Footer from "./components/FooterApp.vue";
-// import { data } from "./assets/data.csv";
+import NavBar from "./components/NavBar.vue";
 export default {
   name: "App",
   components: {
-    ResponsiveLineChart,
     Footer,
-  },
-  data() {
-    return {
-      data: [10, 40, 15, 25, 50],
-    };
-  },
-  methods: {
-    addData() {
-      // add random value from 0 to 50 to array
-      this.data = [...this.data, Math.round(Math.random() * 50)];
-    },
-    filterData() {
-      this.data = this.data.filter((v) => v <= 35);
-    },
+    NavBar,
   },
 };
 </script>

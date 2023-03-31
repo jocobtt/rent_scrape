@@ -17,27 +17,27 @@
   </script>
   
   <style>
-  #app {
-    font-family: Avenir, Helvetica, Arial, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-align: center;
-    color: #2c3e50;
-    max-width: 720px;
-    margin: 100px auto;
-    padding: 0 20px;
-  }
-  svg {
-    /* important for responsiveness */
-    display: block;
-    fill: none;
-    stroke: none;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-    background: #eee;
-  }
-  .buttons {
-    margin-top: 2rem;
-  }
-  </style>
+#app {
+  font-family: Avenir, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-align: center;
+  color: #ff0000;
+  max-width: 720px;
+  margin: 100px auto;
+  padding: 0 20px;
+}
+svg {
+  /* important for responsiveness */
+  display: block;
+  fill: none;
+  stroke: none;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  background: #fff;
+}
+.buttons {
+  margin-top: 2rem;
+}
+</style>
