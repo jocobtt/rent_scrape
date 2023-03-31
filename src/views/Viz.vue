@@ -1,6 +1,7 @@
 <template>
     <div id="app">
       <h1>🗼Tokyo Apartment Data</h1>
+      <!-- <BarChart csvUrl="path/to/our/csvfile.csv" -->
       <responsive-line-chart :data="data" />
       <div class="buttons">
         <button @click="addData">Visualize Data!</button>

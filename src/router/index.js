@@ -18,13 +18,21 @@ const routes = [
       }
     },
     {
-      path: '/model',
-      name: 'Model',
-      component: () => import('../views/Model.vue'),
+      path: '/bar',
+      name: 'Barchart',
+      component: () => import('../views/BarChart.vue'),
       meta: {
-        title: 'Model'
+        title: 'Bar Chart'
       }
     },
+    // {
+    //   path: '/model',
+    //   name: 'Model',
+    //   component: () => import('../views/Model.vue'),
+    //   meta: {
+    //     title: 'Model'
+    //   }
+    // },
     {
       path: '/about',
       name: 'About',

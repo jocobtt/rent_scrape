@@ -10,7 +10,7 @@
       </p>
       <br>
       <p>
-        We are generating the two models to help us predict a persons rent based on the apartment they are looking at. And then we also visualizing some parts of the data itself. We are using Dd3 to visualize the data.
+        We are generating the two models to help us predict a persons rent based on the apartment they are looking at. And then we also visualizing some parts of the data itself. We are using D3 to visualize the data.
       </p>
     </div>
   </template>

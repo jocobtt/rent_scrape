@@ -15,8 +15,11 @@
                 <router-link class="nav-link" to="/about">About</router-link>
               </li>
               <li class="nav-item">
-                <router-link class="nav-link" to="/model">Calculate Rent</router-link>
+                <router-link class="nav-link" to="/bar">BarChart</router-link>
               </li>
+              <!-- <li class="nav-item">
+                <router-link class="nav-link" to="/model">Calculate Rent</router-link>
+              </li> -->
             </ul>
           </div>
         </div>
