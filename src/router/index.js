@@ -17,14 +17,14 @@ const routes = [
         title: 'Viz'
       }
     },
-    {
-      path: '/bar',
-      name: 'Barchart',
-      component: () => import('../views/BarChart.vue'),
-      meta: {
-        title: 'Bar Chart'
-      }
-    },
+    // {
+    //   path: '/bar',
+    //   name: 'Barchart',
+    //   component: () => import('../views/BarChart.vue'),
+    //   meta: {
+    //     title: 'Bar Chart'
+    //   }
+    // },
     // {
     //   path: '/model',
     //   name: 'Model',
