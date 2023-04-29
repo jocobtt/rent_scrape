@@ -9,7 +9,7 @@ import numpy as np
 apart_address = "4-chome-8 Togoshi, Shinagawa City, Tokyo-to 142-0041, Japan"
 
 # make a list of local church addresses to loop through 
-church addresses = ['1 Chome-8-14 Eharacho, Nakano City, Tokyo 165-0023, Japan', '1 Chome-7-7 Kichijoji Higashicho, Musashino, Tokyo 180-0002, Japan', 
+church_addresses = ['1 Chome-8-14 Eharacho, Nakano City, Tokyo 165-0023, Japan', '1 Chome-7-7 Kichijoji Higashicho, Musashino, Tokyo 180-0002, Japan', 
 	'28-8 Sakuragaokacho, Shibuya City, Tokyo 150-0031, Japan', '2 Chome-16-17 Mizonokuchi, Takatsu Ward, Kawasaki, Kanagawa 213-0001, Japan', 
 	'2 Chome-25-11 Minamisenzoku, Ota City, Tokyo 145-0063, Japan']
 
