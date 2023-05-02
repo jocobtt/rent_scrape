@@ -1,7 +1,7 @@
 pandas==1.0.5
 numpy==1.19.0
 arrow==0.8.0
-beautifulsoup4==4.9.1
+beautifulsoup4==4.12.2
 requests==2.24.0
 googlemaps
 flake8==3.7.9
