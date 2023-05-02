@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/jabras/rent_scrape/analysis/mlruns/0/599c0f0fb1e04105bce97af58acab69e/artifacts
+end_time: 1681321216923
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 599c0f0fb1e04105bce97af58acab69e
+run_name: learned-pig-697
+run_uuid: 599c0f0fb1e04105bce97af58acab69e
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1681321214120
+status: 3
+tags: []
+user_id: jabras

@@ -1,0 +1,14 @@
+pandas 
+scikit-learn
+bentoml
+mlflow
+# skl2onnx
+joblib
+
+# fastapi requirements 
+fastapi
+uvicorn
+pydantic
+gunicorn
+fastapi-utils
+fastapi-pagination

@@ -1,0 +1,23 @@
+name: Push to GCR GitHub Action
+on: 
+  push:
+    branches:
+      - main
+jobs:
+  build-and-push-to-gcr-without-gcloud-auth-action:
+    name: Build & push - without gcloud auth action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Building and pushing the image
+        uses: RafikFarhad/push-to-gcr-github-action@v5-beta
+        # uses: RafikFarhad/push-to-gcr-github-action@v5-beta # <- use this on your workflow
+        with:
+          gcloud_service_key: "${{ secrets.GCR_KEY }}"
+          registry: gcr.io
+          project_id: seventh-history-374820
+          image_name: tokyo-model-api
+          image_tag: latest #name-gen-${{ github.sha }}, ${{ github.sha }}
+          dockerfile: ./analysis/Dockerfile
+          context: ./analysis
+          # what is the docker image for though? For the predict api?  
