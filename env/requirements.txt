@@ -1,6 +1,6 @@
 pandas==2.0.1
 numpy==1.19.0
-arrow==0.8.0
+arrow==1.2.3
 beautifulsoup4==4.12.2
 requests==2.29.0
 googlemaps
