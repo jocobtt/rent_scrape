@@ -1,7 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
 const routes = [
-    {
+  {
+    path: '/',
+    redirect: '/home'
+  },
+  {
       path: '/home',
       name: 'Home',
         component: () => import('../views/Home.vue'),
@@ -17,22 +21,22 @@ const routes = [
         title: 'Viz'
       }
     },
-    // {
-    //   path: '/bar',
-    //   name: 'Barchart',
-    //   component: () => import('../views/BarChart.vue'),
-    //   meta: {
-    //     title: 'Bar Chart'
-    //   }
-    // },
-    // {
-    //   path: '/model',
-    //   name: 'Model',
-    //   component: () => import('../views/Model.vue'),
-    //   meta: {
-    //     title: 'Model'
-    //   }
-    // },
+    {
+      path: '/bar',
+      name: 'Barchart',
+      component: () => import('../views/BarChart.vue'),
+      meta: {
+        title: 'Bar Chart'
+      }
+    },
+    {
+      path: '/model',
+      name: 'Model',
+      component: () => import('../views/Model.vue'),
+      meta: {
+        title: 'Model'
+      }
+    },
     {
       path: '/about',
       name: 'About',

@@ -1,14 +1,14 @@
 <template>
-    <div id="app">
-      <h1>🗼Tokyo Apartment Data</h1>
-      <!-- <BarChart csvUrl="path/to/our/csvfile.csv" -->
-      <responsive-line-chart :data="data" />
-      <div class="buttons">
-        <button @click="addData">Visualize Data!</button>
-        <button @click="filterData">Filter data</button>
-      </div>
+  <div id="app">
+    <h1>🗼Tokyo Apartment Data</h1>
+    <!-- <BarChart csvUrl="path/to/our/csvfile.csv" -->
+    <responsive-line-chart :data="data" />
+    <div class="buttons">
+      <button @click="addData">Visualize Data!</button>
+      <button @click="filterData">Filter data</button>
     </div>
-  </template>
+  </div>
+</template>
 
 <script>
 import ResponsiveLineChart from "../components/ResponsiveLineChart.vue";

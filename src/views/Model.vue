@@ -19,6 +19,15 @@
             <input type="text" v-model="ApartmentType" class="form-control"/>
             <label for="KuName">Ku name: </label>
             <input type="text" v-model="KuName" class="form-control"/>
+            <label for="Yearbuilt">Year built: </label>
+            <input type="text" v-model="Yearbuilt" class="form-control"/>
+            <label for="Floor">Floor: </label>
+            <input type="text" v-model="Floor" class="form-control"/>
+            <label for="Distance">Distance: </label>
+            <input type="text" v-model="Distance" class="form-control"/>
+            <label for="Time">Time: </label>
+            <input type="text" v-model="Time" class="form-control"/>
+            
         </div>
         <div class="model__content__right__price">
           <p>Model disclaimer/reminder goes here</p>
@@ -46,17 +55,24 @@ export default {
         ApartmentType: "",
         KuName: "",
         rentPrice: "",
+        Yearbuilt: "",
+        Floor: "",
+        Distance: "",
+        Time: ""
     };
   },
     methods: {
       async callModel() {
         try {
-          const response = await axios.get('http://localhost:5000/predict', {
+          const response = await axios.get('/predict', {
             params: {
               sqrM: this.sqrM,
               ApartmentType: this.ApartmentType,
               KuName: this.KuName,
-              // will have more inputs here
+              Yearbuilt: this.Yearbuilt,
+              Floor: this.Floor,
+              Distance: this.Distance,
+              Time: this.Time
             }
           });
           this.rentPrice = response.data;
@@ -67,3 +83,29 @@ export default {
   },
 };
 </script>
+<!-- want to eventually return prediction confidence etc. -->
+<style>
+#app {
+  font-family: Avenir, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-align: center;
+  color: #ff0000;
+  max-width: 720px;
+  margin: 100px auto;
+  padding: 0 20px;
+}
+svg {
+  /* important for responsiveness */
+  display: block;
+  fill: none;
+  stroke: none;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  background: #fff;
+}
+.buttons {
+  margin-top: 2rem;
+}
+</style>
