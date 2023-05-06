@@ -1,22 +1,20 @@
 <template>
-    <div id="home-page">
-      <h1>Predict your rent!</h1>
-      <div id="main-part">
-        <p> This App showcases a few different ways to generate potential names for a baby. Try it out in the different pages we have available and please give any feedback you have, if any!</p>
-        <br />
-        <p> The first model is a randomly generated name using a Large Language Model! If you want to learn more go to the about page.</p>
-        <!-- change this to instead be a directory of sorts and intro -->
-      </div>
+  <div id="home-page">
+    <h1>Predict your rent! 🗼</h1>
+    <div id="main-part">
+      <p> This app is for visualizing and predicting rent in the greater Tokyo area! </p>
+      <!-- change this to instead be a directory of sorts and intro -->
     </div>
-  </template>
+  </div>
+</template>
   
-  <script>
-  export default {
-    name: "HomeView",
-  };
-  </script>
+<script>
+export default {
+  name: "HomeView",
+};
+</script>
   
-  <style>
+<style>
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;

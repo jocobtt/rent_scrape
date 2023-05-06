@@ -36,8 +36,40 @@
   });
   </script>
   
-  <style scoped>
-  a {
-    cursor: pointer;
-  }
-  </style>
+<style>
+a {
+  cursor: pointer;
+}
+.navbar {
+  display: center;
+  justify-content: space-between;
+  align-items: center;
+  background-color: rgb(122, 191, 247);
+  padding: 10px;
+}
+.navbar-brand {
+  font-size: 24px;
+  font-weight: bold;
+  /* center the text */
+  display: center;
+  text-decoration: none;
+  color: #333;
+}
+.navbar-nav {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.nav-item {
+  margin-left: 10px;
+}
+.nav-link {
+  font-size: 18px;
+  text-decoration: none;
+  color: #333;
+}
+.nav-link:hover {
+  text-decoration: underline;
+}
+</style>

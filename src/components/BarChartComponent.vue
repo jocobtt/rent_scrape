@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import * as d3 from 'd3';
 
 var margin = { top: 30, right: 30, bottom: 70, left: 60 },
@@ -15,10 +15,11 @@ export default {
   props: ['csvData'],
   setup(props) {
     const barChart = ref(null);
+    let svg = null;
 
     onMounted(async () => {
       // Parse the CSV data
-      const data = await d3.csvParse(props.csvData, d3.autoType);
+      const data = await d3.csvParse(props.csvData,d3.autoType);
 
       const svg = d3
         .select(barChart.value)
@@ -60,6 +61,12 @@ export default {
           return height - y(d.rent_price);
         })
         .attr('fill', '#69b3a2');
+    });
+
+    onUnmounted(() => {
+      if (svg) {
+        svg.remove();
+      }
     });
 
     return { barChart };

@@ -10,3 +10,5 @@ https://github.com/rafahuelin/data_visualization_vue_d3/blob/master/src/App.vue
 https://dev.to/muratkemaldar/using-vue-3-with-d3-composition-api-3h1g
 
 D3 application for visulizing rent in Tokyo Japan. Data and models come from [this repo]()
+
+drop name place
