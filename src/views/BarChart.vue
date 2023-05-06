@@ -7,7 +7,7 @@
 
 <script>
 import Barchart from "../components/Barchart.vue";
-import localCsvData from "tokyo_model.csv";
+import localCsvData from "../tokyo_model.csv";
 
 export default{
     name: "BarChart",
