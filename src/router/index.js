@@ -24,7 +24,7 @@ const routes = [
     {
       path: '/bar',
       name: 'Barchart',
-      component: () => import('../views/BarChart.vue'),
+      component: () => import('../views/BarChartView.vue'),
       meta: {
         title: 'Bar Chart'
       }

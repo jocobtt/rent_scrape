@@ -6,13 +6,13 @@
 </template>
 
 <script>
-import Barchart from "../components/Barchart.vue";
+import BarChart from "../components/BarChartComponent.vue";
 import localCsvData from "../tokyo_model.csv";
 
 export default{
     name: "BarChart",
     components: {
-        Barchart,
+        BarChart,
     },
     data() {
         return {
