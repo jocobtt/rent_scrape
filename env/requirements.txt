@@ -2,7 +2,7 @@ pandas==2.0.1
 numpy==1.19.0
 arrow==1.2.3
 beautifulsoup4==4.12.2
-requests==2.29.0
+requests==2.30.0
 googlemaps
 flake8==6.0.0
 pytest==5.2.4
