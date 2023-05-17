@@ -2,7 +2,7 @@ name: Push to GCR GitHub Action
 on: 
   push:
     branches:
-      - main
+      - master
 jobs:
   build-and-push-to-gcr-without-gcloud-auth-action:
     name: Build & push - without gcloud auth action
