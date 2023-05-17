@@ -6,11 +6,18 @@ from pydantic import BaseModel, BaseSettings
 import uvicorn
 # import mlflow
 import joblib
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 import pandas as pd
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# class MlflowRun(BaseModel):
+#     run_id: str
+#     experiment_name: str
+#     experiment_id: str
+#     metrics: Dict[str, float]
+#     params: Dict[str, str]
 
 class InputData(BaseModel):
     sqr_m: float
@@ -65,11 +72,26 @@ async def challenger_predict(data: InputData):
     # return the prediction
     return {"prediction": pred}
 
-# @app.get("/mlflow_metrics") # do we want this to be done at start up though? 
-# async def get_mlflow_metrics(run_id: str):
-#     with mlflow.start_run(run_id=run_id):
-#         metrics = mlflow.get_run(run_id).data.metrics
-#         return metrics
+# @app.get("/api/mlflow-data", response_model=List[MLflowRun])
+# async def get_mlflow_data() -> List[MLflowRun]:
+#     mlflow.set_tracking_uri(mlflow_data_path)
+#     client = mlflow.tracking.MlflowClient()
+#     experiments = client.list_experiments()
+
+#     data = []
+#     for exp in experiments:
+#         runs = client.search_runs(exp.experiment_id)
+#         for run in runs:
+#             run_data = MLflowRun(
+#                 experiment_id=exp.experiment_id,
+#                 experiment_name=exp.name,
+#                 run_id=run.info.run_id,
+#                 metrics=run.data.metrics,
+#                 params=run.data.params,
+#             )
+#             data.append(run_data)
+
+#     return data
 
 # @app.get("/refresh_model")
 # async def refresh_model():

@@ -10,9 +10,9 @@ RUN mkdir /work
 WORKDIR /work
 COPY requirements.txt requirements.txt
 COPY model_api.py work/model_api.py
-COPY passed-model work/passed-model 
+COPY passed-model.joblib work/passed-model.joblib 
 COPY passed-model.joblib work/passed-model.joblib
-COPY challenger_model.joblib work/challenger_model.joblib
+COPY challenger-model.joblib work/challenger-model.joblib
 
 RUN pip install --upgrade pip
 RUN pip3 install -r requirements.txt
