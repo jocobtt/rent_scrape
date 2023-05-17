@@ -2,3 +2,10 @@
 todo.md
 .env
 seventh-history-374820-186ad22f5135.json
+cloud_run_sa.json
+*.terraform
+*.tfstate
+use.plan
+.terraform.lock.hcl
+terraform.tfstate*
+*api_venv

@@ -13,11 +13,15 @@ variable "location" {
   default = "us-east1"
 }
 
+variable "create_bucket" {
+  type    = bool 
+  default = false
+}
+
 variable "app_version" {
   type    = string 
   default = "latest"
 }
-
 
 variable "auto_scale" {
   type    = number 

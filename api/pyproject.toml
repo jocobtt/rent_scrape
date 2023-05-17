@@ -1,0 +1,25 @@
+[project]
+name = "api"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"  # Use Python 3.9 for better compatibility
+dependencies = [
+    "numpy>=1.20.0,<2.0.0",  # Add numpy explicitly first
+    "numba>=0.53.0",         # Use a newer version of numba
+    "pandas",
+    "scikit-learn",
+    "bentoml",
+    "mlflow",
+    "joblib",
+    "transformers",
+    "shap",
+    "lightgbm",
+    "datasets",
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "gunicorn",
+    "fastapi-utils",
+    "fastapi-pagination"
+]

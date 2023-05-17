@@ -24,22 +24,22 @@ provider "google-beta" {
 }
 
 # create a service account to attribute to the bucket 
-# resource "google_service_account" "gcs_sa" {
-#   account_id   = "gcs-sa"
-#   display_name = "GCS SA"
-# }
+resource "google_service_account" "gcs_sa" {
+  account_id   = "gcs-sa"
+  display_name = "GCS SA"
+}
 
 
-# # create cloud storage bucket for storing the model states and other artifacts
-# resource "google_storage_bucket" "gcs_bucket" {
-#   name          = "bby-gcr-namez-bucket"
-#   location      = var.location
-#   storage_class = "REGIONAL" # what other options do I have? 
-#   # secure the bucket 
-#   uniform_bucket_level_access = true
-#   service_account_email       = google_service_account.gcs_sa.email
+# create cloud storage bucket for storing the model states and other artifacts
+resource "google_storage_bucket" "gcs_bucket" {
+  count         = var.create_bucket ? 1 : 0
+  name          = "rent-scraperz-bucket"
+  location      = var.location
+  storage_class = "REGIONAL"  
+  # secure the bucket 
+  uniform_bucket_level_access = true
   
-# }
+}
 
 
 data "google_iam_policy" "noauth" {
@@ -74,7 +74,7 @@ resource "google_cloud_run_service" "fast-api" {
         }
       }
       # the service uses this SA to call other Google Cloud APIs
-      # service_account_name = myservice_runtime_sa
+      service_account_name = google_service_account.gcs_sa.email
     }
 
     metadata {
@@ -89,6 +89,7 @@ resource "google_cloud_run_service" "fast-api" {
   autogenerate_revision_name = true
 
 }
+
 # allow unauthenticated access to the service 
 resource "google_cloud_run_service_iam_policy" "noauth2" {
   location    = google_cloud_run_service.fast-api.location
@@ -97,3 +98,22 @@ resource "google_cloud_run_service_iam_policy" "noauth2" {
 
   policy_data = data.google_iam_policy.noauth.policy_data
 }
+
+# jabras@Jacobs-MacBook-Pro TF % terraform apply use.plan
+
+# google_service_account.gcs_sa: Creating...
+# google_cloud_run_service.fast-api: Creating...
+# google_service_account.gcs_sa: Creation complete after 1s [id=projects/seventh-history-374820/serviceAccounts/gcs-sa@seventh-history-374820.iam.gserviceaccount.com]
+# google_cloud_run_service.fast-api: Still creating... [10s elapsed]
+# google_cloud_run_service.fast-api: Still creating... [20s elapsed]
+# google_cloud_run_service.fast-api: Still creating... [30s elapsed]
+# google_cloud_run_service.fast-api: Still creating... [40s elapsed]
+# google_cloud_run_service.fast-api: Still creating... [50s elapsed]
+
+# Error: Error waiting to create Service: resource is in failed state "Ready:False", message: Revision 'tokyo-run-00001-fct' is not ready and cannot serve traffic. The user-provided container failed to start and listen on the port defined provided by the PORT=8000 environment variable. Logs for this revision might contain more information.
+
+# Logs URL: https://console.cloud.google.com/logs/viewer?project=seventh-history-374820&resource=cloud_run_revision/service_name/tokyo-run/revision_name/tokyo-run-00001-fct&advancedFilter=resource.type%3D%22cloud_run_revision%22%0Aresource.labels.service_name%3D%22tokyo-run%22%0Aresource.labels.revision_name%3D%22tokyo-run-00001-fct%22 
+# For more troubleshooting guidance, see https://cloud.google.com/run/docs/troubleshooting#container-failed-to-start
+
+#   on main.tf line 56, in resource "google_cloud_run_service" "fast-api":
+#   56: resource "google_cloud_run_service" "fast-api" {

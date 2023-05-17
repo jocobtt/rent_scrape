@@ -1,0 +1,47 @@
+name: Terraform Apply GitHub Action
+
+on:
+  # adding this to allow for manual triggering of the workflow
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to (production/test)'
+        required: true
+        default: 'production'
+  push:
+    branches:
+      - main
+    # only trigger when the changes are in the TF folder or the yaml specifically for the Terraform plan or apply
+    # This keeps our CI/CD pipeline from triggering when we make changes to the Images or github actions
+    paths:
+      - 'TF/**'
+      - '.github/workflows/terraform-apply.yaml'
+
+env: 
+  DEFAULT_ENVIRONMENT: "production"
+
+jobs:
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # call our composite action
+      - uses: ./.github/actions/terraform-plan
+        with:
+          # aws-access-key-id: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
+          # aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # aws-region: us-east-1
+          # nexus-username: ${{ secrets.NEXUS_USERNAME }}
+          # nexus-password: ${{ secrets.NEXUS_PASSWORD }}
+          tf-directory: TF
+          environment: ${{ github.event.inputs.environment || env.DEFAULT_ENVIRONMENT }}
+
+      - name: Terraform Apply
+        shell: bash
+        working-directory: TF
+        run: |
+          terraform apply tf_plan_file.plan

@@ -1,0 +1,104 @@
+name: 'Terraform Init and Plan'
+description: 'Common logic Terraform Plan'
+# inputs:
+#   aws-access-key-id:
+#     description: AWS_ACCESS_KEY_ID
+#     required: true
+#   aws-secret-access-key:
+#     description: AWS_SECRET_ACCESS_KEY
+#     required: true
+#   aws-region:
+#     description: AWS_REGION
+#     required: true
+#   tf-directory:
+#     description: path to terraform directory
+#     required: true
+
+runs:
+  using: 'composite'
+  steps:
+
+    - name: Install Node
+      uses: actions/setup-node@v1
+      with:
+        node-version: '16'
+
+    - name: Install kubeseal 
+      shell: bash
+      run: |
+        KUBESEAL_VERSION='0.24.0' # Set this to, for example, KUBESEAL_VERSION='0.23.0'
+        wget "https://github.com/bitnami-labs/sealed-secrets/releases/download/v${KUBESEAL_VERSION:?}/kubeseal-${KUBESEAL_VERSION:?}-linux-amd64.tar.gz"
+        tar -xvzf kubeseal-${KUBESEAL_VERSION:?}-linux-amd64.tar.gz kubeseal
+        sudo install -m 755 kubeseal /usr/local/bin/kubeseal
+        
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ inputs.aws-access-key-id }}
+        aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
+        aws-region: ${{ inputs.aws-region }}
+
+    - name: Install AWS CLI v2
+      shell: bash
+      run: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+        unzip -q /tmp/awscliv2.zip -d /tmp
+        rm /tmp/awscliv2.zip
+        sudo /tmp/aws/install --update
+        rm -rf /tmp/aws/
+        aws --version
+
+    - name: Setup Terraform CLI
+      uses: hashicorp/setup-terraform@v2.0.2
+
+    - name: Install tflint
+      shell: bash
+      run: |
+        wget https://github.com/terraform-linters/tflint/releases/download/v0.31.0/tflint_linux_amd64.zip
+        unzip tflint_linux_amd64.zip
+        sudo mv tflint /usr/bin/
+        tflint -v
+      
+    - name: Run tflint
+      shell: bash
+      run: tflint 
+    
+    - name: Install infracost
+      shell: bash
+      run: |
+        curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+        infracost --version
+    
+    - name: Run infracost
+      shell: bash
+      run: infracost breakdown --path ${{ inputs.tf-directory }} --format json
+
+    - name: Install checkov
+      shell: bash
+      run: |
+        pip install checkov
+      
+    - name: Run checkov
+      shell: bash
+      run: checkov -d ${{ inputs.tf-directory }}
+
+      # do we want to add harden runner? - https://github.com/marketplace/actions/harden-runner
+
+    - name: Terraform Init
+      shell: bash
+      working-directory: ${{ inputs.tf-directory }}
+      run: |
+        terraform init
+
+    - name: Terraform Validate
+      shell: bash
+      working-directory: ${{ inputs.tf-directory }}
+      run: |
+        terraform validate
+
+    - name: Terraform Plan
+      shell: bash
+      working-directory: ${{ inputs.tf-directory }}
+      run: |
+        terraform plan -var-file=values.tfvars -out=tf_plan_file.plan

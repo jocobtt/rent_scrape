@@ -10,6 +10,7 @@ from typing import Optional
 
 url = "http://localhost:8000/predict"
 # data = Input(rei_price=1.0, shikikin = 2, maintenence_price=12, sqr_m = 1000).dict()
+health_url = "http://localhost:8000/health"
 
 data = {
     "sqr_m": 30.0,
@@ -33,3 +34,9 @@ if response.status_code == 200:
         print("Error decoding JSON:", e)
 else:
     print("Error:", response.text)
+
+# health check
+response = requests.get(health_url)
+print("Health check status code:", response.status_code)
+print("Health check content:", response.content)
+
