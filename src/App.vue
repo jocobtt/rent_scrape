@@ -1,12 +1,17 @@
 <template>
-  <div class="container">
+  <v-app full-height full-width>
+    <div class="container">
     <NavBar />
   </div>
-  <div id="app">
-    <routerView></routerView>
+  <v-main>
+    <v-container>
+      <router-view></router-view>
+    </v-container>
+  </v-main>
+  <div>
+    <Footer />
   </div>
-  <div>  <Footer /> </div>
-
+  </v-app>
 </template>
 
 <script>
@@ -22,26 +27,6 @@ export default {
 </script>
 
 <style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #ff0000;
-  max-width: 720px;
-  margin: 100px auto;
-  padding: 0 20px;
-}
-svg {
-  /* important for responsiveness */
-  display: block;
-  fill: none;
-  stroke: none;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  background: #fff;
-}
 .buttons {
   margin-top: 2rem;
 }

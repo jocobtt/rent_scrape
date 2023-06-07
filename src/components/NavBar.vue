@@ -2,7 +2,7 @@
     <header>
       <nav class="navbar navbar-dark bg-dark">
         <div class="container">
-          <a class="navbar-brand" href="/">Baby Name Generator</a>
+          <a class="navbar-brand" href="/">Rent Predictor</a>
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav me-auto mb-2 mb-md-0">
               <li class="nav-item">
@@ -17,9 +17,9 @@
               <li class="nav-item">
                 <router-link class="nav-link" to="/bar">BarChart</router-link>
               </li>
-              <!-- <li class="nav-item">
+              <li class="nav-item">
                 <router-link class="nav-link" to="/model">Calculate Rent</router-link>
-              </li> -->
+              </li>
             </ul>
           </div>
         </div>
@@ -29,8 +29,6 @@
   
   <script>
   import { defineComponent } from 'vue';
-  import { useRouter } from 'vue-router';
-  const router = useRouter();
   export default defineComponent({
     name: 'NavBar',
   });
@@ -41,8 +39,8 @@ a {
   cursor: pointer;
 }
 .navbar {
-  display: center;
-  justify-content: space-between;
+  display: flex;
+  justify-content: center;
   align-items: center;
   background-color: rgb(122, 191, 247);
   padding: 10px;
@@ -51,7 +49,8 @@ a {
   font-size: 24px;
   font-weight: bold;
   /* center the text */
-  display: center;
+  display: flex;
+  justify-content: center;
   text-decoration: none;
   color: #333;
 }
