@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import Csv from 'vite-plugin-csv';
+import dsv from '@rollup/plugin-dsv';
 
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [vue(), Csv()],
+  plugins: [vue(), dsv()],
 })
+// https://github.com/vitejs/vite/discussions/8271

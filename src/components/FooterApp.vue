@@ -3,11 +3,11 @@
           <div className="max-w-sm">
             <p className="text-center text-xs">
               <i>
-                This app was built using ML. Use at your own risk.
+                This app has ML embedded into it. Use at your own risk.
               </i>
               <br />
               <i>
-                Refer to the About page for more information.
+                Refer to the <router-link to="/about">About page</router-link> for more information.
               </i>
             </p>
             <div className="mt-2 flex justify-center text-center">
