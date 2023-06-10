@@ -1,6 +1,6 @@
-pandas==2.0.1
+pandas==2.0.2
 numpy==1.24.3
 arrow==1.2.3
 beautifulsoup4==4.12.2
-requests==2.30.0
 mechanize==0.4.8
+requests==2.31.0
