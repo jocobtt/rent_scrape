@@ -20,4 +20,3 @@ jobs:
           image_tag: latest #name-gen-${{ github.sha }}, ${{ github.sha }}
           dockerfile: ./analysis/Dockerfile
           context: ./analysis
-          # what is the docker image for though? For the predict api?  

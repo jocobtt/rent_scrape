@@ -1,7 +1,7 @@
 name: rent-pipe
 on:
   schedule:
-    - cron:  '0 0 * * 1/14' # run once every two weeks on sunday
+    - cron:  '0 0 1 * *' # run once every two weeks on sunday
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,7 +17,7 @@ jobs:
       - name: install python packages
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r ./analysis/requirements.txt
           
       - name: execute challenger py script 
         run: python ./analysis/challenger_model.py
