@@ -8,7 +8,7 @@ jobs:
     name: Build & push - without gcloud auth action
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Building and pushing the image
         uses: RafikFarhad/push-to-gcr-github-action@v5-beta
         # uses: RafikFarhad/push-to-gcr-github-action@v5-beta # <- use this on your workflow
