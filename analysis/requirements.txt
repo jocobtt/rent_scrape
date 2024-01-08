@@ -4,6 +4,7 @@ bentoml
 mlflow
 # skl2onnx
 joblib
+lightgbm
 
 # fastapi requirements 
 fastapi
