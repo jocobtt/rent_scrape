@@ -10,8 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Building and pushing the image
-        uses: RafikFarhad/push-to-gcr-github-action@v5-beta
-        # uses: RafikFarhad/push-to-gcr-github-action@v5-beta # <- use this on your workflow
+        uses: RafikFarhad/push-to-gcr-github-action@v5-rc1
+        # uses: RafikFarhad/push-to-gcr-github-action@v5-rc1 # <- use this on your workflow
         with:
           gcloud_service_key: "${{ secrets.GCR_KEY }}"
           registry: gcr.io
