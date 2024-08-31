@@ -4,7 +4,7 @@
   font-weight: 400;
 
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
+  color: #000000;
   background-color: #ffffff;
 
   font-synthesis: none;
@@ -16,26 +16,28 @@
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: #000000;
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: #000000;
 }
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: #000000;
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: #000000;
 }
 
 body {
   margin: 0;
   display: flex;
-  place-items: center;
+  flex-direction: column; /* Stack elements vertically */
+  align-items: center; /* Center elements horizontally */
+  justify-content: center; /* Center elements vertically */
   min-width: 320px;
   min-height: 100vh;
 }
@@ -52,12 +54,13 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #ff00000;
+  background-color: #000000;
   cursor: pointer;
   transition: border-color 0.25s;
 }
+
 button:hover {
-  border-color: #646cff;
+  border-color: #000000;
 }
 button:focus,
 button:focus-visible {
@@ -69,19 +72,31 @@ button:focus-visible {
 }
 
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
+  width: 100%; /* Take up the full width of its container */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   padding: 2rem;
   text-align: center;
 }
 
+
+.navbar {
+  width: 100%; /* Take up the full width of its container */
+  display: flex;
+  justify-content: space-between; /* Space out navbar items evenly */
+  align-items: center; /* Center items vertically */
+  padding: 1rem 2rem; /* Add some padding */
+}
+
 @media (prefers-color-scheme: light) {
   :root {
-    color: #213547;
+    color: #000000;
     background-color: #ffffff;
   }
   a:hover {
-    color: #747bff;
+    color: #000000;
   }
   button {
     background-color: #f9f9f9;
