@@ -22,14 +22,6 @@ const routes = [
       }
     },
     {
-      path: '/bar',
-      name: 'Barchart',
-      component: () => import('../views/BarChartView.vue'),
-      meta: {
-        title: 'Bar Chart'
-      }
-    },
-    {
       path: '/model',
       name: 'Model',
       component: () => import('../views/Model.vue'),
