@@ -14,7 +14,7 @@
     "d3": "^7.9.0",
     "vue": "^3.4.38",
     "vue-router": "^4.4.3",
-    "vuetify": "^3.5.8"
+    "vuetify": "^3.7.1"
   },
   "devDependencies": {
     "@mdi/font": "^7.4.47",
