@@ -38,6 +38,22 @@ const routes = [
       }
     },
     {
+      path: '/barChart',
+      name: 'BarChart',
+      component: () => import('../views/BarChartView.vue'),
+      meta: {
+        title: 'BarChart'
+      }
+    },
+    {
+      path: '/scatterPlot',
+      name: 'ScatterPlot',
+      component: () => import('../views/ScatterPlotView.vue'),
+      meta: {
+        title: 'ScatterPlot'
+      }
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
       component: () => import('../views/NotFound.vue'),

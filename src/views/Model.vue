@@ -8,13 +8,15 @@
       <div class="model__form">
         <div class="form-group">
           <label for="sqrM">Square Meters:</label>
-          <input type="number" v-model="sqrM" class="form-control" placeholder="Enter square meters" />
+          <input type="number" v-model="sqrM" class="form-control" placeholder="e.g., 80" min="0" max="1000" />
         </div>
         <div class="form-group">
           <label for="ApartmentType">Apartment Type:</label>
           <select v-model="ApartmentType" class="form-control">
             <option disabled value="">Please select one</option>
-            <option v-for="type in apartmentTypes" :key="type">{{ type }}</option>
+            <option v-for="type in apartmentTypes" :key="type" :value="type">
+              {{ type }}
+            </option>
           </select>
         </div>
         <div class="form-group">
@@ -22,6 +24,7 @@
           <select v-model="KuName" class="form-control">
             <option disabled value="">Please select one</option>
             <option v-for="type in KuNames" :key="type">{{ type }}</option>
+
           </select>
         </div>
         <div class="form-group">
@@ -35,7 +38,9 @@
           <label for="Floor">Floor:</label>
           <select v-model="Floor" class="form-control">
             <option disabled value="">Please select one</option>
-            <option v-for="type in Floors" :key="type">{{ type }}</option>
+            <option v-for="floor in floorOptions" :key="floor" :value="floor">
+              {{ floor === 0 ? 'Ground Floor' : floor }}
+            </option>
           </select>
         </div>
         <button type="button" @click="callModel" class="btn btn-success">Calculate Rent!</button>
@@ -49,7 +54,47 @@
 </template>
 
 <script>
-// your existing script code
+// make axios api call 
+import axios from 'axios';
+export default {
+    name: "Model",
+    data() {
+    return {
+        sqrM: "",
+        ApartmentType: "",
+        apartmentTypes: ["1DK", "2K", "1K", "2DK", "1LDK", "2LDK", "Other"],
+        KuName: "",
+        KuNames: ["中野", "目黒", "文京", "新宿", "荒川", "墨田", "中央", "台東", "江東", "品川", "杉並", "港", "大田", "その他"],
+        rentPrice: "",
+        Yearbuilt: "",
+        YearBuilts: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25"],
+        Floor: "",
+        floorOptions: Array.from({ length: 21 }, (_, i) => i),
+        Distance: "",
+        Time: ""
+    };
+  },
+    methods: {
+      async callModel() {
+        try {
+          const response = await axios.get('/predict', {
+            params: {
+              sqrM: this.sqrM,
+              ApartmentType: this.ApartmentType,
+              KuName: this.KuName,
+              Yearbuilt: this.Yearbuilt,
+              Floor: this.Floor,
+              Distance: this.Distance,
+              Time: this.Time
+            }
+          });
+          this.rentPrice = response.data;
+        } catch (error) {
+          console.log(error);
+        }
+    }
+  },
+};
 </script>
 
 <style>

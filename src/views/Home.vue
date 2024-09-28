@@ -33,7 +33,7 @@ body, html {
 
 /* Hero section styling */
 .hero-section {
-  background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
+  background: linear-gradient(to right, #fe4f4f 0%, #93929261 100%);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
