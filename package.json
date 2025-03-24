@@ -19,7 +19,7 @@
   "devDependencies": {
     "@mdi/font": "^7.4.47",
     "@rollup/plugin-dsv": "^3.0.5",
-    "@vitejs/plugin-vue": "^5.2.1",
+    "@vitejs/plugin-vue": "^5.2.3",
     "csv-loader": "^3.0.5",
     "vite": "^6.0.11"
   }
