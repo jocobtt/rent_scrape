@@ -1,10 +1,10 @@
 import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
+import react from '@vitejs/plugin-react'
 import dsv from '@rollup/plugin-dsv';
 
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [vue(), dsv()],
+  plugins: [react(), dsv()],
 })
 // https://github.com/vitejs/vite/discussions/8271

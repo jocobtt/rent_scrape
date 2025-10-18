@@ -1,0 +1,103 @@
+.not-found {
+  padding: var(--spacing-3xl) var(--spacing-lg);
+  min-height: calc(100vh - 70px);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.6s ease-out;
+}
+
+.not-found h1 {
+  font-size: clamp(5rem, 15vw, 10rem);
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--spacing-lg);
+  line-height: 1;
+  animation: slideInFromLeft 0.6s ease-out;
+}
+
+.not-found h2 {
+  font-size: clamp(1.5rem, 3vw, 2.5rem);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+  animation: slideInFromRight 0.6s ease-out 0.2s backwards;
+}
+
+.not-found p {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-2xl);
+  max-width: 500px;
+  animation: fadeIn 0.8s ease-out 0.4s backwards;
+}
+
+.not-found button {
+  padding: 1rem 2.5rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  box-shadow: 0 8px 20px -5px rgba(99, 102, 241, 0.4);
+  position: relative;
+  overflow: hidden;
+  animation: fadeIn 1s ease-out 0.6s backwards;
+}
+
+.not-found button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-color) 100%);
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.not-found button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px -5px rgba(99, 102, 241, 0.5);
+}
+
+.not-found button:hover::before {
+  opacity: 1;
+}
+
+.not-found button:active {
+  transform: translateY(-1px);
+}
+
+.home-link {
+  text-decoration: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .not-found {
+    padding: var(--spacing-2xl) var(--spacing-md);
+  }
+
+  .not-found button {
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .not-found h1,
+  .not-found h2,
+  .not-found p,
+  .not-found button {
+    animation: none;
+  }
+}
