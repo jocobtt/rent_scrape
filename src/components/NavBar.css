@@ -82,13 +82,19 @@
   transition: width 0.3s ease;
 }
 
-.nav-link:hover {
+.nav-link:hover,
+.nav-link.active {
   color: var(--primary-color);
   background: rgba(99, 102, 241, 0.08);
 }
 
-.nav-link:hover::after {
+.nav-link:hover::after,
+.nav-link.active::after {
   width: 80%;
+}
+
+.nav-link.active {
+  font-weight: 600;
 }
 
 /* Mobile menu button */

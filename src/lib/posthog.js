@@ -34,7 +34,7 @@ export const initPostHog = () => {
     },
 
     // Disable in development for cleaner logs
-    loaded: (ph) => {
+    loaded: (_ph) => {
       if (import.meta.env.DEV) {
         console.log('PostHog initialized in development mode');
       }

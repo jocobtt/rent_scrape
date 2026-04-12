@@ -21,8 +21,7 @@ export const parseTokyoRentData = (csvText) => {
     floor: parseInt(row.floor, 10),
     house_type: row.house_type,
     eki_walk: parseInt(row.eki_walk, 10),
-    // Derived fields
-    age: new Date().getFullYear() - parseInt(row.year_built, 10),
+    // year_built in the dataset is years since construction (0 = new build)
     price_per_sqm: parseFloat(row.rent_price) / parseFloat(row.sqr_m),
   })).filter(d => !isNaN(d.rent_price) && !isNaN(d.sqr_m));
 };

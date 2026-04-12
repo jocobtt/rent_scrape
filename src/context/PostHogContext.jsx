@@ -4,6 +4,7 @@ import { initPostHog, trackPageView } from '../lib/posthog';
 
 const PostHogContext = createContext(null);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const usePostHog = () => {
   return useContext(PostHogContext);
 };

@@ -6,14 +6,49 @@ const About = () => {
     <div className="about-page">
       <div className="about-container">
         <h1>About This Project</h1>
+
         <p>
-          This is a D3 application for visualizing rent in Tokyo, Japan.
-          The data and models are used to help predict apartment rental prices
-          in the greater Tokyo area.
+          <strong>Tokyo Rent Explorer</strong> is a full-stack data science project for visualizing
+          and predicting apartment rental prices across Tokyo&apos;s 23 special wards. It combines
+          real listing data scraped from Suumo with interactive D3.js visualizations and a
+          machine learning prediction API.
         </p>
+
+        <h2>The Data</h2>
         <p>
-          This application uses React, D3.js for data visualization, and various
-          machine learning models to provide accurate rent predictions.
+          Rental listings are scraped from <strong>Suumo</strong>, Japan&apos;s largest real estate
+          portal, using a custom Python scraper. The dataset covers 900+ apartments across 17 Tokyo
+          wards with fields including rent price, apartment type, floor, size (m²), key money,
+          security deposit, maintenance fees, and walking distance to the nearest train station.
+        </p>
+
+        <h2>Visualizations</h2>
+        <p>
+          The dashboard is built with <strong>React 18</strong> and <strong>D3.js v7</strong>.
+          Charts include an interactive scatter plot (rent vs. size), a geographic heatmap
+          overlaid on Tokyo ward boundaries, bar charts, and histograms for rent price,
+          apartment size, walk time, and building age. All charts respond to the filter panel
+          in real time, and filter state is encoded in the URL for easy sharing.
+        </p>
+
+        <h2>Machine Learning</h2>
+        <p>
+          The rent predictor is powered by a <strong>LightGBM</strong> gradient boosting model
+          trained on the scraped data and served via a <strong>FastAPI</strong> backend. The
+          model pipeline includes automated challenger model evaluation, A/B testing between
+          model versions, drift monitoring with Evidently AI, and model registry management
+          through <strong>MLflow</strong>. Promotion from staging to production requires
+          meeting thresholds on RMSE, R², and MAPE — and at least a 2% improvement over
+          the current production model.
+        </p>
+
+        <h2>Tech Stack</h2>
+        <p>
+          <strong>Frontend:</strong> React 18, D3.js v7, React Router v6, Vite, Axios, PostHog analytics
+          <br />
+          <strong>Backend:</strong> FastAPI, LightGBM, scikit-learn, MLflow, Evidently AI, Docker
+          <br />
+          <strong>Data:</strong> Python scraper (BeautifulSoup), pandas, CSV pipeline
         </p>
       </div>
     </div>

@@ -1,10 +1,47 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { getUniqueValues } from '../lib/dataUtils';
+import { useToast } from '../context/ToastContext';
+import useDebounce from '../hooks/useDebounce';
 import './DataFilters.css';
 
 const DataFilters = ({ data, filters, onFilterChange, onReset }) => {
+  const { showSuccess } = useToast();
   const apartmentTypes = getUniqueValues(data, 'apartment_type');
   const wards = getUniqueValues(data, 'ku_name');
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    showSuccess('Filter link copied to clipboard!');
+  };
+
+  // Local state for range inputs so typing feels instant; debounce before propagating
+  const [localPriceRange, setLocalPriceRange] = useState(filters.priceRange);
+  const [localSqmRange, setLocalSqmRange] = useState(filters.sqmRange);
+
+  const debouncedPriceRange = useDebounce(localPriceRange, 300);
+  const debouncedSqmRange = useDebounce(localSqmRange, 300);
+
+  useEffect(() => {
+    onFilterChange({ priceRange: debouncedPriceRange });
+  }, [debouncedPriceRange, onFilterChange]);
+
+  useEffect(() => {
+    onFilterChange({ sqmRange: debouncedSqmRange });
+  }, [debouncedSqmRange, onFilterChange]);
+
+  // Keep local state in sync when filters are reset externally
+  const priceMin = filters.priceRange[0];
+  const priceMax = filters.priceRange[1];
+  const sqmMin = filters.sqmRange[0];
+  const sqmMax = filters.sqmRange[1];
+
+  useEffect(() => {
+    setLocalPriceRange([priceMin, priceMax]);
+  }, [priceMin, priceMax]);
+
+  useEffect(() => {
+    setLocalSqmRange([sqmMin, sqmMax]);
+  }, [sqmMin, sqmMax]);
 
   const handleApartmentTypeChange = (type) => {
     const newTypes = filters.apartmentTypes.includes(type)
@@ -24,9 +61,14 @@ const DataFilters = ({ data, filters, onFilterChange, onReset }) => {
     <div className="data-filters">
       <div className="filter-section">
         <h3>Filters</h3>
-        <button className="reset-button" onClick={onReset}>
-          Reset All Filters
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="reset-button" onClick={onReset}>
+            Reset All
+          </button>
+          <button className="reset-button" onClick={handleCopyLink} title="Copy shareable link with current filters">
+            🔗 Share
+          </button>
+        </div>
       </div>
 
       <div className="filter-section">
@@ -34,16 +76,16 @@ const DataFilters = ({ data, filters, onFilterChange, onReset }) => {
         <div className="range-inputs">
           <input
             type="number"
-            value={filters.priceRange[0]}
-            onChange={(e) => onFilterChange({ priceRange: [+e.target.value, filters.priceRange[1]] })}
+            value={localPriceRange[0]}
+            onChange={(e) => setLocalPriceRange([+e.target.value, localPriceRange[1]])}
             min="0"
             max="50"
           />
           <span>to</span>
           <input
             type="number"
-            value={filters.priceRange[1]}
-            onChange={(e) => onFilterChange({ priceRange: [filters.priceRange[0], +e.target.value] })}
+            value={localPriceRange[1]}
+            onChange={(e) => setLocalPriceRange([localPriceRange[0], +e.target.value])}
             min="0"
             max="50"
           />
@@ -55,16 +97,16 @@ const DataFilters = ({ data, filters, onFilterChange, onReset }) => {
         <div className="range-inputs">
           <input
             type="number"
-            value={filters.sqmRange[0]}
-            onChange={(e) => onFilterChange({ sqmRange: [+e.target.value, filters.sqmRange[1]] })}
+            value={localSqmRange[0]}
+            onChange={(e) => setLocalSqmRange([+e.target.value, localSqmRange[1]])}
             min="0"
             max="200"
           />
           <span>to</span>
           <input
             type="number"
-            value={filters.sqmRange[1]}
-            onChange={(e) => onFilterChange({ sqmRange: [filters.sqmRange[0], +e.target.value] })}
+            value={localSqmRange[1]}
+            onChange={(e) => setLocalSqmRange([localSqmRange[0], +e.target.value])}
             min="0"
             max="200"
           />
@@ -72,7 +114,7 @@ const DataFilters = ({ data, filters, onFilterChange, onReset }) => {
       </div>
 
       <div className="filter-section">
-        <h4>Max Walk Time (min): {filters.walkTime}</h4>
+        <h4>Max Walk Time (min): {filters.walkTime >= 30 ? '30+' : filters.walkTime}</h4>
         <input
           type="range"
           value={filters.walkTime}
