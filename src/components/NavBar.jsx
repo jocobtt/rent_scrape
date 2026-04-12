@@ -1,26 +1,27 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { trackEvent } from '../lib/posthog';
 import './NavBar.css';
 
 const NavBar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const location = useLocation();
 
   const navLinks = [
     { to: '/home', text: 'Home' },
     { to: '/dashboard', text: 'Dashboard' },
-    { to: '/model', text: 'Calculate Rent' },
-    { to: '/about', text: 'About' }
+    { to: '/model',   text: 'Predict Rent' },
+    { to: '/compare', text: 'Compare Models' },
+    { to: '/about',   text: 'About' }
   ];
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
-    trackEvent('mobile_menu_toggled', {
-      isOpen: !isMobileMenuOpen,
-    });
+    trackEvent('mobile_menu_toggled', { isOpen: !isMobileMenuOpen });
   };
 
   const handleNavClick = (link) => {
+    setIsMobileMenuOpen(false);
     trackEvent('navigation_clicked', {
       destination: link.to,
       label: link.text,
@@ -32,13 +33,13 @@ const NavBar = () => {
     <header>
       <nav className="navbar">
         <div className="container">
-          <Link className="navbar-brand" to="/">Rent Predictor</Link>
+          <Link className="navbar-brand" to="/">🗼 Tokyo Rent</Link>
           <div className="navbar-links">
             <ul className="navbar-nav">
               {navLinks.map((link) => (
                 <li key={link.to} className="nav-item">
                   <Link
-                    className="nav-link"
+                    className={`nav-link${location.pathname === link.to ? ' active' : ''}`}
                     to={link.to}
                     onClick={() => handleNavClick(link)}
                   >
@@ -52,19 +53,10 @@ const NavBar = () => {
             onClick={toggleMobileMenu}
             className="mobile-menu-button"
             aria-label="Toggle mobile menu"
+            aria-expanded={isMobileMenuOpen}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M4 6h16M4 12h16m-7 6h7"
-              />
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
             </svg>
           </button>
         </div>
@@ -74,7 +66,7 @@ const NavBar = () => {
               {navLinks.map((link) => (
                 <li key={link.to} className="nav-item">
                   <Link
-                    className="nav-link"
+                    className={`nav-link${location.pathname === link.to ? ' active' : ''}`}
                     to={link.to}
                     onClick={() => handleNavClick(link)}
                   >

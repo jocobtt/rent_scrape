@@ -25,15 +25,18 @@ const InteractiveScatterPlot = ({ data }) => {
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Scales
+    // Use 2nd–98th percentile for axis domains to avoid outlier distortion
+    const sortedSqm = data.map(d => d.sqr_m).sort(d3.ascending);
+    const sortedRent = data.map(d => d.rent_price).sort(d3.ascending);
+
     const xScale = d3
       .scaleLinear()
-      .domain([0, d3.max(data, d => d.sqr_m) * 1.1])
+      .domain([0, d3.quantile(sortedSqm, 0.98) * 1.05])
       .range([0, width]);
 
     const yScale = d3
       .scaleLinear()
-      .domain([0, d3.max(data, d => d.rent_price) * 1.1])
+      .domain([0, d3.quantile(sortedRent, 0.98) * 1.05])
       .range([height, 0]);
 
     const colorScale = d3
@@ -205,7 +208,7 @@ const InteractiveScatterPlot = ({ data }) => {
           <p><strong>Rent:</strong> ¥{(selectedPoint.rent_price * 10000).toLocaleString()}/month</p>
           <p><strong>Size:</strong> {selectedPoint.sqr_m} m²</p>
           <p><strong>Floor:</strong> {selectedPoint.floor === 0 ? 'Ground' : selectedPoint.floor}</p>
-          <p><strong>Building Age:</strong> {selectedPoint.age} years</p>
+          <p><strong>Building Age:</strong> {selectedPoint.year_built} years</p>
           <p><strong>Walk to Station:</strong> {selectedPoint.eki_walk} minutes</p>
         </div>
       )}

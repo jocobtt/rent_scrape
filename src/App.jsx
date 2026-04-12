@@ -7,9 +7,8 @@ import Footer from './components/Footer'
 import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
 import Model from './pages/Model'
+import Compare from './pages/Compare'
 import About from './pages/About'
-import BarChartView from './pages/BarChartView'
-import ScatterPlotView from './pages/ScatterPlotView'
 import NotFound from './pages/NotFound'
 
 function App() {
@@ -25,9 +24,8 @@ function App() {
                 <Route path="/home" element={<Home />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/model" element={<Model />} />
+                <Route path="/compare" element={<Compare />} />
                 <Route path="/about" element={<About />} />
-                <Route path="/barChart" element={<BarChartView />} />
-                <Route path="/scatterPlot" element={<ScatterPlotView />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>
