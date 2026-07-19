@@ -1,0 +1,156 @@
+[31m[2026-03-28 18:52:37] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-03-28 18:52:37] [ERROR   ] [services.prediction_service][0m Passed model prediction error: The feature names should match those that were passed during fit.
+Feature names seen at fit time, yet now missing:
+- apartment_type_1DK
+- apartment_type_1K
+- apartment_type_1LDK
+- apartment_type_2DK
+- apartment_type_2K
+- ...
+
+[31m[2026-03-28 18:52:37] [ERROR   ] [model_api][0m Prediction error: The feature names should match those that were passed during fit.
+Feature names seen at fit time, yet now missing:
+- apartment_type_1DK
+- apartment_type_1K
+- apartment_type_1LDK
+- apartment_type_2DK
+- apartment_type_2K
+- ...
+
+[31m[2026-03-28 18:52:37] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 500
+[31m[2026-03-28 18:52:37] [ERROR   ] [services.prediction_service][0m Challenger model prediction error: Number of features of the model must match the input. Model n_features_ is 34 and input n_features is 7
+[31m[2026-03-28 18:52:37] [ERROR   ] [model_api][0m Challenger prediction error: Number of features of the model must match the input. Model n_features_ is 34 and input n_features is 7
+[31m[2026-03-28 18:52:37] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 500
+[31m[2026-03-28 18:52:37] [ERROR   ] [services.prediction_service][0m Passed model prediction error: The feature names should match those that were passed during fit.
+Feature names seen at fit time, yet now missing:
+- apartment_type_1DK
+- apartment_type_1K
+- apartment_type_1LDK
+- apartment_type_2DK
+- apartment_type_2K
+- ...
+
+[31m[2026-03-28 18:52:37] [ERROR   ] [services.prediction_service][0m Comparison prediction error: The feature names should match those that were passed during fit.
+Feature names seen at fit time, yet now missing:
+- apartment_type_1DK
+- apartment_type_1K
+- apartment_type_1LDK
+- apartment_type_2DK
+- apartment_type_2K
+- ...
+
+[31m[2026-03-28 18:52:37] [ERROR   ] [model_api][0m Comparison prediction error: The feature names should match those that were passed during fit.
+Feature names seen at fit time, yet now missing:
+- apartment_type_1DK
+- apartment_type_1K
+- apartment_type_1LDK
+- apartment_type_2DK
+- apartment_type_2K
+- ...
+
+[31m[2026-03-28 18:52:37] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 500
+[31m[2026-03-28 18:52:37] [ERROR   ] [model_api][0m Error getting ensemble methods: 503: Ensemble prediction service not available - models not loaded
+[31m[2026-03-28 18:52:37] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 500
+[31m[2026-03-28 18:53:56] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-03-28 18:53:56] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-03-28 18:53:56] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-03-28 18:53:56] [ERROR   ] [model_api][0m Prediction error: 503: Prediction service not available - models not loaded
+[31m[2026-03-28 18:53:56] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 500
+[31m[2026-03-28 18:53:56] [ERROR   ] [model_api][0m Challenger prediction error: 503: Prediction service not available - models not loaded
+[31m[2026-03-28 18:53:56] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 500
+[31m[2026-03-28 18:53:56] [ERROR   ] [model_api][0m Comparison prediction error: 503: Prediction service not available - models not loaded
+[31m[2026-03-28 18:53:56] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 500
+[31m[2026-03-28 18:53:56] [ERROR   ] [model_api][0m Error getting ensemble methods: 503: Ensemble prediction service not available - models not loaded
+[31m[2026-03-28 18:53:56] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 500
+[31m[2026-03-28 18:54:40] [ERROR   ] [model_api][0m Prediction error: 503: Prediction service not available - models not loaded
+[31m[2026-03-28 18:54:40] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 500
+[31m[2026-03-28 18:54:54] [ERROR   ] [model_api][0m Prediction error: 503: Prediction service not available - models not loaded
+[31m[2026-03-28 18:54:54] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 500
+[31m[2026-03-28 18:55:42] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-03-28 18:55:42] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-03-28 18:55:42] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-03-28 18:55:42] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-03-28 18:55:42] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-03-28 18:55:42] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-03-28 18:55:42] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-03-29 13:24:43] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-03-29 13:24:43] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-03-29 13:24:43] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-03-29 13:24:43] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-03-29 13:24:43] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-03-29 13:24:43] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-03-29 13:24:43] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-03-29 13:31:14] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-03-29 13:31:14] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-03-29 13:31:14] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-03-29 13:31:14] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-03-29 13:31:14] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-03-29 13:31:14] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-03-29 13:31:14] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-03-29 13:43:01] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-03-29 13:43:01] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-03-29 13:43:01] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-03-29 13:43:01] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-03-29 13:43:01] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-03-29 13:43:01] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-03-29 13:43:01] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-03-29 13:59:16] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-03-29 13:59:16] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-03-29 13:59:16] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-03-29 13:59:16] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-03-29 13:59:16] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-03-29 13:59:16] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-03-29 13:59:16] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-03-29 14:01:33] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-03-29 14:01:33] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-03-29 14:01:33] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-03-29 14:01:33] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-03-29 14:01:33] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-03-29 14:01:33] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-03-29 14:01:33] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-03-29 14:07:11] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-03-29 14:07:11] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-03-29 14:07:11] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-03-29 14:07:11] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-03-29 14:07:11] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-03-29 14:07:11] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-03-29 14:07:11] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-03-29 14:08:55] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-03-29 14:08:55] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-03-29 14:08:55] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-03-29 14:08:55] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-03-29 14:08:55] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-03-29 14:08:55] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-03-29 14:08:55] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-03-29 14:15:07] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-03-29 14:15:07] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-03-29 14:15:07] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-03-29 14:15:07] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-03-29 14:15:07] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-03-29 14:15:07] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-03-29 14:15:07] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-03-29 14:19:02] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-03-29 14:19:02] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-03-29 14:19:02] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-03-29 14:19:02] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-03-29 14:19:02] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-03-29 14:19:02] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-03-29 14:19:02] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-07-19 15:28:08] [ERROR   ] [services.training_service][0m Data quality gate failed: ['Too few listings to train on: 2 (minimum 5)', '>50% of rent_price values are 0 (100%) — scrape likely broken', '>60% of sqr_m values are 0 (100%) — scrape likely broken']
+[31m[2026-07-19 15:28:31] [ERROR   ] [services.training_service][0m Data quality gate failed: ['Too few listings to train on: 2 (minimum 5)', '>50% of rent_price values are 0 (100%) — scrape likely broken', '>60% of sqr_m values are 0 (100%) — scrape likely broken']
+[31m[2026-07-19 15:28:39] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-07-19 15:28:39] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-07-19 15:28:39] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-07-19 15:28:39] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-07-19 15:28:39] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-07-19 15:28:39] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-07-19 15:28:39] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-07-19 15:28:39] [ERROR   ] [services.training_service][0m Data quality gate failed: ['Too few listings to train on: 2 (minimum 5)', '>50% of rent_price values are 0 (100%) — scrape likely broken', '>60% of sqr_m values are 0 (100%) — scrape likely broken']
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [services.training_service][0m Data quality gate failed: ['Too few listings to train on: 2 (minimum 5)', '>50% of rent_price values are 0 (100%) — scrape likely broken', '>60% of sqr_m values are 0 (100%) — scrape likely broken']

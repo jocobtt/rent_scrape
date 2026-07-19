@@ -1,0 +1,28 @@
+{
+  "hash": "b61d0a667796360f29b2e904365aabcbde5b454e183ccf3275020b28a1502a39",
+  "hash_short": "b61d0a667796",
+  "created_at": "2026-03-29T18:24:41.799950+00:00",
+  "source_description": "Suumo scrape: temp_training_data.csv",
+  "n_rows": 8,
+  "n_cols": 16,
+  "columns": [
+    "rent_price",
+    "sqr_m",
+    "rei_price",
+    "shikikin",
+    "floor",
+    "maintenence_price",
+    "contract_type",
+    "year_built",
+    "nearest_eki_walk",
+    "ku_name_-",
+    "apartment_type_1K",
+    "apartment_type_1LDK",
+    "apartment_type_2LDK",
+    "apartment_type_\u30ef\u30f3\u30eb\u30fc\u30e0",
+    "house_type_\u8cc3\u8cb8\u30a2\u30d1\u30fc\u30c8",
+    "house_type_\u8cc3\u8cb8\u30de\u30f3\u30b7\u30e7\u30f3"
+  ],
+  "data_path": "/Users/jacobbraswell/apps/rent_scrape/api/dataset_versions/b61d0a667796/data.csv",
+  "manifest_path": "/Users/jacobbraswell/apps/rent_scrape/api/dataset_versions/b61d0a667796/manifest.json"
+}

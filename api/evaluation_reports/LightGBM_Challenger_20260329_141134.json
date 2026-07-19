@@ -1,0 +1,141 @@
+{
+  "model_name": "LightGBM_Challenger",
+  "timestamp": "2026-03-29T14:11:30.683196",
+  "data_shape": {
+    "train_samples": 6,
+    "train_features": 15,
+    "test_samples": 2
+  },
+  "cross_validation": {
+    "cv_folds": 5,
+    "metrics": {
+      "rmse_mean": NaN,
+      "rmse_std": 0.0,
+      "mae_mean": NaN,
+      "mae_std": 0.0,
+      "r2_mean": NaN,
+      "r2_std": 0.0,
+      "train_rmse_mean": NaN,
+      "train_r2_mean": NaN,
+      "overfitting_gap_rmse": 0.0,
+      "overfitting_gap_r2": 0.0
+    },
+    "fold_results": [],
+    "oof_predictions": [],
+    "oof_metrics": {
+      "rmse": NaN,
+      "mae": NaN,
+      "r2": NaN
+    }
+  },
+  "learning_curves": {
+    "train_sizes": [
+      6
+    ],
+    "train_scores": {
+      "mean": [
+        NaN
+      ],
+      "std": [
+        0.0
+      ]
+    },
+    "val_scores": {
+      "mean": [
+        NaN
+      ],
+      "std": [
+        0.0
+      ]
+    },
+    "diagnosis": {
+      "final_train_rmse": NaN,
+      "final_val_rmse": NaN,
+      "generalization_gap": 0.0,
+      "status": "insufficient_data"
+    }
+  },
+  "test_set": {
+    "metrics": {
+      "rmse": 1.6218131384937673,
+      "mae": 1.5,
+      "mse": 2.630277856191004,
+      "median_ae": 1.5,
+      "mape": 17.44861235090864,
+      "r2": -0.1690123805293351,
+      "max_error": 2.1166667302449547,
+      "mean_error": -0.6166667302449547,
+      "std_error": 1.5,
+      "pct_within_5pct": 0.0,
+      "pct_within_10pct": 50.0,
+      "pct_within_20pct": 50.0
+    },
+    "residual_analysis": {
+      "residual_stats": {
+        "mean": -0.6166667302449547,
+        "std": 1.5,
+        "min": -2.1166667302449547,
+        "max": 0.8833332697550453,
+        "q25": -1.3666667302449547,
+        "median": -0.6166667302449547,
+        "q75": 0.13333326975504534,
+        "skewness": NaN,
+        "kurtosis": NaN
+      },
+      "residual_pct_stats": {
+        "mean": -9.34463739902749,
+        "std": 17.44861235090864,
+        "median": -9.34463739902749
+      },
+      "largest_errors": {
+        "indices": [
+          1,
+          0
+        ],
+        "values": [
+          0.8833332697550453,
+          -2.1166667302449547
+        ],
+        "predictions": [
+          10.016666730244955,
+          10.016666730244955
+        ],
+        "actuals": [
+          10.9,
+          7.9
+        ]
+      },
+      "normality_check": {
+        "skewness_near_zero": false,
+        "kurtosis_near_three": false,
+        "likely_normal": false
+      }
+    }
+  },
+  "train_set": {
+    "metrics": {
+      "rmse": 1.6303544263612006,
+      "mae": 1.6166666666666665,
+      "mse": 2.6580555555555594,
+      "median_ae": 1.5999999999999996,
+      "mape": 16.551005962245856,
+      "r2": -1.5543122344752192e-15,
+      "max_error": 1.983333269755045,
+      "mean_error": -6.357828811568804e-08,
+      "std_error": 1.6303544263611993,
+      "pct_within_5pct": 0.0,
+      "pct_within_10pct": 0.0,
+      "pct_within_20pct": 83.33333333333334
+    }
+  },
+  "summary": {
+    "cross_validation_rmse": "nan \u00b1 0.00",
+    "cross_validation_r2": "nan \u00b1 0.0000",
+    "overfitting_status": "Good Generalization",
+    "recommendation": "Model performance looks good. Ready for production consideration.",
+    "test_rmse": "1.62",
+    "test_r2": "-0.1690",
+    "test_mape": "17.45%",
+    "pct_within_10pct": "50.0%"
+  }
+}

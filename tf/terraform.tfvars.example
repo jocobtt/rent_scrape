@@ -1,0 +1,61 @@
+# Tokyo Rent Predictor - Terraform Configuration Example
+# Copy this file to terraform.tfvars and update with your values
+
+# GCP Project Configuration
+project_id           = "your-gcp-project-id"
+location             = "us-east1"  # or your preferred region
+service_account_file = "~/.gcp-sa-key.json"
+
+# Application Version
+app_version = "latest"  # or specific git SHA
+
+# Storage
+create_bucket = false  # Set to true to create GCS bucket
+
+# Auto-Scaling Configuration
+auto_scale = 10   # Maximum instances (increase for high traffic)
+min_scale  = 1    # Minimum instances (0 = scale to zero, 1+ = always warm)
+                  # Recommended: 0 for dev, 1+ for production (avoids cold starts)
+
+# Resource Limits
+cpu_limit    = "2000m"  # 2 vCPU (options: 1000m, 2000m, 4000m)
+memory_limit = "2Gi"    # 2GB RAM (options: 512Mi, 1Gi, 2Gi, 4Gi, 8Gi)
+                        # ML models need 2Gi+ for optimal performance
+
+# Performance Configuration
+cpu_throttling = false  # Set to true to save costs (throttles CPU when idle)
+request_timeout = 300   # 5 minutes (important for model training/retraining)
+concurrency = 80        # Max concurrent requests per instance
+                        # Lower for CPU-intensive models (e.g., 10-20)
+                        # Higher for light workloads (e.g., 80-1000)
+
+# MLflow Configuration
+mlflow_tracking_uri = "gs://your-bucket-name/mlruns"  # Use GCS for production
+# mlflow_tracking_uri = "file:///tmp/mlruns"          # Use local for dev/testing
+
+# ============================================================================
+# Configuration Presets
+# ============================================================================
+
+# DEVELOPMENT (Low Cost, Cold Starts OK)
+# auto_scale = 3
+# min_scale = 0
+# cpu_limit = "1000m"
+# memory_limit = "1Gi"
+# cpu_throttling = true
+
+# PRODUCTION (High Performance, Always Warm)
+# auto_scale = 10
+# min_scale = 2
+# cpu_limit = "2000m"
+# memory_limit = "2Gi"
+# cpu_throttling = false
+# concurrency = 20  # Lower for ML workloads
+
+# HIGH TRAFFIC (Scale to Demand)
+# auto_scale = 50
+# min_scale = 5
+# cpu_limit = "4000m"
+# memory_limit = "4Gi"
+# cpu_throttling = false
+# concurrency = 10

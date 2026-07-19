@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+data:
+  settings.json: |
+    {
+      "timeoutSeconds": 30,
+      "maxRetries": 3,
+      "cachingEnabled": true
+    }

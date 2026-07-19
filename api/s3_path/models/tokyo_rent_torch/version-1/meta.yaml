@@ -1,0 +1,12 @@
+creation_timestamp: 1707441094244
+current_stage: None
+description: null
+last_updated_timestamp: 1707441094244
+name: tokyo_rent_torch
+run_id: 936ed6dc25d248b5b561609e0ee4fe3a
+run_link: null
+source: /Users/jabras/rent_scrape/analysis/s3_path/0/936ed6dc25d248b5b561609e0ee4fe3a/artifacts/torch
+status: READY
+status_message: null
+user_id: null
+version: 1

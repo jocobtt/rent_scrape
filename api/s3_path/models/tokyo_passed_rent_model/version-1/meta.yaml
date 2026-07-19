@@ -1,0 +1,12 @@
+creation_timestamp: 1707600013622
+current_stage: None
+description: null
+last_updated_timestamp: 1707600013622
+name: tokyo_passed_rent_model
+run_id: bccc8994534a482588416e47b7c9a296
+run_link: null
+source: /Users/jabras/rent_scrape/analysis/s3_path/0/bccc8994534a482588416e47b7c9a296/artifacts/reg_passed_model
+status: READY
+status_message: null
+user_id: null
+version: 1
