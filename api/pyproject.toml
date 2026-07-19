@@ -5,11 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"  # Use Python 3.9 for better compatibility
 dependencies = [
-    "numpy>=1.20.0,<2.0.0",  # Add numpy explicitly first
-    "numba>=0.53.0",         # Use a newer version of numba
+    "numpy>=1.20.0,<2.0.0",
     "pandas",
     "scikit-learn",
-    "bentoml",
     "mlflow",
     "joblib",
     "transformers",
@@ -20,6 +18,27 @@ dependencies = [
     "uvicorn",
     "pydantic",
     "gunicorn",
-    "fastapi-utils",
-    "fastapi-pagination"
+    "beautifulsoup4>=4.12.0",
+    "requests>=2.25.0",
+    "python-dotenv>=0.19.0",
+    "httpx>=0.24.0",
+    "evidently>=0.4.0",
+    "plotly>=5.0.0",
+    "scipy>=1.10.0",
+    "schedule>=1.2.0",
+    "psutil>=5.9.0",
+    "slowapi>=0.1.9",
+    "torch>=2.0.0",
+    "tabpfn>=0.1.0",
+    "pytorch-tabnet>=4.0",
+    "optuna>=3.0.0",
+    "lime>=0.2.0",
+    "pytest>=7.0.0",
+    "pytest-mock>=3.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "integration: marks tests that require a live network connection (deselect with '-m not integration')",
 ]

@@ -52,40 +52,110 @@ data "google_iam_policy" "noauth" {
 }
 
 
-// fastapi app 
+// fastapi app
 resource "google_cloud_run_service" "fast-api" {
   name     = "tokyo-run"
-  
+
   location = var.location
 
   template {
     spec {
       containers {
         image = format("gcr.io/%s/tokyo-model-api:%s", var.project_id, var.app_version)
-        ports {
-          name = "http1"
-          container_port = 8000 
+
+        # Environment variables
+        env {
+          name  = "PORT"
+          value = "8000"
         }
+
+        env {
+          name  = "MLFLOW_TRACKING_URI"
+          value = var.mlflow_tracking_uri
+        }
+
+        env {
+          name  = "PYTHONUNBUFFERED"
+          value = "1"
+        }
+
+        ports {
+          name           = "http1"
+          container_port = 8000
+        }
+
+        # Health check configuration - Using new Kubernetes-style probes
+        startup_probe {
+          http_get {
+            path = "/startup"
+            port = 8000
+          }
+          initial_delay_seconds = 10
+          timeout_seconds       = 5
+          period_seconds        = 10
+          failure_threshold     = 6  # 60 seconds total for model loading
+        }
+
+        liveness_probe {
+          http_get {
+            path = "/health"
+            port = 8000
+          }
+          initial_delay_seconds = 0  # Start immediately after startup probe passes
+          timeout_seconds       = 5
+          period_seconds        = 30
+          failure_threshold     = 3
+        }
+
+        # Readiness probe for traffic routing
+        # Cloud Run uses startup + liveness, but we document readiness for k8s
+        # For Cloud Run, the startup probe acts as readiness
+
         resources {
           limits = {
-            cpu    = "1000m"
-            memory = "512M"
+            cpu    = var.cpu_limit
+            memory = var.memory_limit
           }
         }
       }
+
+      # Request timeout (important for model predictions)
+      timeout_seconds = var.request_timeout
+
+      # Maximum concurrent requests per instance
+      container_concurrency = var.concurrency
+
       # the service uses this SA to call other Google Cloud APIs
       service_account_name = google_service_account.gcs_sa.email
     }
 
     metadata {
       annotations = {
-        # Limit scale up to prevent any cost blow outs!
-        "autoscaling.knative.dev/maxScale" = var.auto_scale
+        # Auto-scaling configuration
+        "autoscaling.knative.dev/maxScale" = tostring(var.auto_scale)
+        "autoscaling.knative.dev/minScale" = tostring(var.min_scale)
+
+        # Performance optimizations
+        "run.googleapis.com/startup-cpu-boost" = "true"
+        "run.googleapis.com/cpu-throttling" = tostring(var.cpu_throttling)
+
+        # Execution environment
+        "run.googleapis.com/execution-environment" = "gen2"
+
+        # Session affinity for better performance (optional)
+        # "run.googleapis.com/sessionAffinity" = "true"
+
         # all egress from the service should go through the VPC Connector
         #"run.googleapis.com/vpc-access-egress" = "all-traffic"
       }
     }
   }
+
+  traffic {
+    percent         = 100
+    latest_revision = true
+  }
+
   autogenerate_revision_name = true
 
 }

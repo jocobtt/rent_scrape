@@ -1,112 +1,189 @@
+"""
+Updated PyTorch model runner using advanced neural network implementations.
+
+This script demonstrates both custom neural networks and transformer models
+for Tokyo rent prediction with proper MLflow integration.
+"""
+
 import torch
 from torch.utils.data import Dataset, DataLoader
 from datasets import load_dataset
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, AdamW
-from sklearn.model_selection import train_test_split
 import mlflow
 import mlflow.pytorch
 import pandas as pd
 import numpy as np
-# https://towardsdatascience.com/attention-for-time-series-classification-and-forecasting-261723e0006d
-# load your dataset and pull out X and y
-ds = load_dataset("jbrazzy/tokyo_rent", split="train")
-df = ds.to_pandas()
+import logging
+from sklearn.model_selection import train_test_split
 
-# make categorical variables and one-hot encode them
-df['ku_name'] = df['ku_name'].astype('category')
-df = pd.get_dummies(df, columns=['ku_name'])
-df['apartment_type'] = df['apartment_type'].astype('category')
-df = pd.get_dummies(df, columns=['apartment_type'])
-df['house_type'] = df['house_type'].astype('category')
-df = pd.get_dummies(df, columns=['house_type'])
+# Import our advanced models
+from models.torch_model import TorchRentPredictor, train_and_compare_torch_models
+from models.transformer_model import TransformerRentPredictor, train_transformer_models
 
-# drop the address column and define X, y
-df = df.drop(['address'], axis=1)
-X = df.drop('rent_price', axis=1)
-y = df['rent_price']
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Split your dataset into a training set and a test set
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Set MLflow tracking URI (uses environment variable or defaults to local)
+import os
+mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
+mlflow.set_tracking_uri(mlflow_uri)
+logger.info(f"MLflow tracking URI: {mlflow_uri}")
 
-# Create a custom Dataset class
-class MyDataset(Dataset):
-    def __init__(self, X, y):
-        self.X = X.fillna(0)  # replace NaN values with 0
-        self.y = y.fillna(0)  # replace NaN values with 0
 
-    def __len__(self):
-        return len(self.y)
-
-    def __getitem__(self, idx):
-        x_values = self.X.iloc[idx].values.astype('float32')
-        y_value = np.array([self.y.iloc[idx]]).astype('float32')  # Keep as 1-element array
-        return torch.from_numpy(x_values), torch.from_numpy(y_value)
-
-# Create datasets and dataloaders
-train_data = MyDataset(X_train, y_train)
-test_data = MyDataset(X_test, y_test)
-train_loader = DataLoader(train_data, batch_size=32)
-test_loader = DataLoader(test_data, batch_size=32)
-
-# Load the pre-trained model and tokenizer from Hugging Face
-model_name = "bert-base-uncased"  # Replace with a suitable transformer model for your task
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-# Initialize the model
-model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=1)
-
-# Freeze some layers if necessary (optional, for fine-tuning)
-for param in model.base_model.parameters():
-    param.requires_grad = False
-
-# Define optimizer and loss function for regression
-optimizer = AdamW(model.parameters(), lr=1e-5)
-loss_fn = torch.nn.MSELoss()
-
-# Training loop
-model.train()
-for epoch in range(10):  # Number of epochs
-    for batch in train_loader:
-        optimizer.zero_grad()
-        features, labels = batch
-        output = model(features).logits  # Get logits for regression
-        loss = loss_fn(output.squeeze(), labels.squeeze())
-        loss.backward()
-        optimizer.step()
-
-# Evaluate your model
-model.eval()
-predictions = []
-with torch.no_grad():
-    for batch in test_loader:
-        features, labels = batch
-        output = model(features).logits
-        predictions.extend(output.squeeze().tolist())
-
-# Convert predictions and test labels to tensors
-predictions = torch.tensor(predictions)
-y_test_tensor = torch.tensor(y_test.values.astype('float32'))
-
-# Calculate MSE
-mse = torch.nn.functional.mse_loss(predictions, y_test_tensor)
-print(f"Test MSE: {mse}")
-
-# Log your model and metrics with MLflow
-mlflow.set_tracking_uri("s3_path")
-with mlflow.start_run() as run:
-    mlflow.log_metric("mse", mse.item())
-    mlflow.pytorch.log_model(model, "model")
-
-    run_id = run.info.run_id
-    model_uri = f"runs:/{run_id}/torch"
+def run_comprehensive_torch_training():
+    """
+    Run comprehensive PyTorch model training including:
+    1. Advanced tabular neural networks
+    2. Ensemble models
+    3. Transformer-based models
+    4. Model comparison and selection
+    """
     
-    # Register the model in MLflow
-    registered_model_name = "tokyo_rent_transformer"
-    mlflow.register_model(model_uri, registered_model_name)
+    logger.info("Starting comprehensive PyTorch model training...")
+    
+    with mlflow.start_run(run_name="comprehensive_torch_training") as main_run:
+        all_results = {}
+        
+        # 1. Train advanced PyTorch models
+        logger.info("="*60)
+        logger.info("TRAINING ADVANCED PYTORCH MODELS")
+        logger.info("="*60)
+        
+        torch_results = train_and_compare_torch_models()
+        all_results.update(torch_results)
+        
+        # 2. Train transformer models
+        logger.info("="*60)
+        logger.info("TRAINING TRANSFORMER MODELS")  
+        logger.info("="*60)
+        
+        transformer_results = train_transformer_models()
+        all_results.update(transformer_results)
+        
+        # 3. Compare all models
+        logger.info("="*60)
+        logger.info("MODEL COMPARISON SUMMARY")
+        logger.info("="*60)
+        
+        best_model = None
+        best_rmse = float('inf')
+        
+        for model_name, result in all_results.items():
+            if 'metrics' in result:
+                rmse = result['metrics']['rmse']
+                r2 = result['metrics']['r2']
+                mae = result['metrics']['mae']
+                
+                logger.info(f"{model_name:20s}: RMSE={rmse:7.2f}, MAE={mae:7.2f}, R²={r2:6.4f}")
+                
+                if rmse < best_rmse:
+                    best_rmse = rmse
+                    best_model = model_name
+        
+        # Log overall results
+        if best_model:
+            logger.info(f"\n🏆 BEST OVERALL MODEL: {best_model} (RMSE: {best_rmse:.2f})")
+            
+            mlflow.log_param("best_overall_model", best_model)
+            mlflow.log_metric("best_overall_rmse", best_rmse)
+            mlflow.log_metric("best_overall_r2", all_results[best_model]['metrics']['r2'])
+            
+            # Register best model
+            try:
+                best_predictor = all_results[best_model]['predictor']
+                model_path = f"best_torch_model_{best_model}.pth"
+                
+                if hasattr(best_predictor, 'save_model'):
+                    best_predictor.save_model(model_path)
+                    mlflow.log_artifact(model_path)
+                    
+                    # Register in MLflow model registry
+                    model_uri = f"runs:/{main_run.info.run_id}/{model_path}"
+                    mlflow.register_model(model_uri, "tokyo_rent_torch_best")
+                    
+                    logger.info(f"✅ Best model registered: tokyo_rent_torch_best")
+                
+            except Exception as e:
+                logger.error(f"Failed to register best model: {e}")
+        
+        # Log model count and types
+        mlflow.log_metric("total_models_trained", len(all_results))
+        mlflow.log_param("model_types", list(all_results.keys()))
+        
+    return all_results
 
-# Save the model locally
-torch.save(model.state_dict(), 'torch_model.pth')
+
+def quick_torch_demo():
+    """
+    Quick demonstration of a single PyTorch model for testing.
+    """
+    logger.info("Running quick PyTorch demo...")
+    
+    # Initialize predictor
+    predictor = TorchRentPredictor(model_type="tabular")
+    
+    # Load data
+    X, y = predictor.load_and_prepare_data()
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
+    
+    with mlflow.start_run(run_name="quick_torch_demo") as run:
+        # Quick hyperparameter setup
+        hyperparams = {
+            'learning_rate': 0.001,
+            'weight_decay': 1e-5,
+            'batch_size': 128,
+            'patience': 10,
+            'dropout_rate': 0.3,
+            'hidden_dims': [512, 256, 128, 64],
+            'use_attention': True
+        }
+        
+        # Train model
+        logger.info("Training tabular neural network...")
+        history = predictor.train_model(X_train, y_train, X_val, y_val, 
+                                      hyperparams, num_epochs=50)
+        
+        # Evaluate
+        metrics = predictor.evaluate_model(X_test, y_test)
+        
+        # Log results
+        mlflow.log_params(hyperparams)
+        mlflow.log_metrics(metrics)
+        
+        # Save model
+        model_path = "quick_demo_torch_model.pth"
+        predictor.save_model(model_path)
+        mlflow.log_artifact(model_path)
+        
+        logger.info(f"Demo Results - RMSE: {metrics['rmse']:.2f}, R²: {metrics['r2']:.4f}")
+        
+    return predictor, metrics
 
 
-# loss could be better.. 
-# could regularize my model, early stop, or tune hyperparameters, feature engineer or use a different model
+if __name__ == "__main__":
+    # Choose training mode
+    import sys
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "quick":
+        # Quick demo mode
+        predictor, metrics = quick_torch_demo()
+        print(f"Quick Demo Complete! RMSE: {metrics['rmse']:.2f}")
+        
+    else:
+        # Comprehensive training mode
+        results = run_comprehensive_torch_training()
+        print("Comprehensive PyTorch Training Complete!")
+        
+        # Print summary
+        print("\n" + "="*60)
+        print("FINAL RESULTS SUMMARY")
+        print("="*60)
+        
+        for model_name, result in results.items():
+            if 'metrics' in result:
+                metrics = result['metrics']
+                print(f"{model_name:20s}: RMSE={metrics['rmse']:7.2f}, R²={metrics['r2']:6.4f}")
+        
+        print("\n🚀 All PyTorch models trained and logged to MLflow!")
+        print("Check your MLflow UI to compare model performance and artifacts.")

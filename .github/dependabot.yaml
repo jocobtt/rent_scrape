@@ -1,23 +1,83 @@
 version: 2
 updates:
-  # GitHub Actions
+  # GitHub Actions - weekly for security updates
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
     commit-message:
-      prefix: ⬆
-  # Python
+      prefix: "🔒⬆"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "security"
+      - "github-actions"
+    open-pull-requests-limit: 5
+
+  # Python API dependencies - weekly for security
   - package-ecosystem: "pip"
-    directory: "/"
+    directory: "/api"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
     commit-message:
-      prefix: ⬆
-  # Terraform
+      prefix: "🔒⬆"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "security"
+      - "python"
+      - "api"
+    open-pull-requests-limit: 10
+    # Security updates only for critical packages
+    allow:
+      - dependency-type: "direct"
+        update-type: "security"
+      - dependency-type: "indirect"
+        update-type: "security"
+    # Group security updates together
+    groups:
+      security-updates:
+        patterns:
+          - "fastapi*"
+          - "uvicorn*"
+          - "pydantic*"
+          - "requests*"
+          - "cryptography*"
+          - "pillow*"
+          - "urllib3*"
+          - "certifi*"
+
+  # Docker base images - weekly for security patches
+  - package-ecosystem: "docker"
+    directory: "/api"
+    schedule:
+      interval: "weekly"
+      day: "thursday"
+      time: "09:00"
+    commit-message:
+      prefix: "🔒⬆"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "security"
+      - "docker"
+
+  # Terraform - monthly for infrastructure updates
   - package-ecosystem: "terraform"
-    directory: "/"
+    directory: "/tf"
     schedule:
       interval: "monthly"
+      day: "friday"
+      time: "09:00"
     commit-message:
-      prefix: ⬆
+      prefix: "🔒⬆"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "security"
+      - "terraform"
+      - "infrastructure"

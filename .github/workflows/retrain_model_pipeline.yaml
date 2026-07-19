@@ -1,60 +1,75 @@
-name: rent-pipe
+name: Automated Model Retraining
 
 on:
   workflow_dispatch:
+    inputs:
+      force_retrain:
+        description: 'Force retraining even if conditions are not met'
+        required: false
+        default: 'false'
+        type: boolean
+      models_to_retrain:
+        description: 'Models to retrain (comma-separated: challenger,passed)'
+        required: false
+        default: 'challenger,passed'
+      pages:
+        description: 'Page range to scrape (start,end — e.g. 0,50)'
+        required: false
+        default: '0,50'
   schedule:
-    # run every month on the 1st
-    - cron: '0 0 1 * *'
+    # Run every month on the 1st at 2 AM UTC
+    - cron: '0 2 1 * *'
+
 jobs:
-  build:
+  retrain-models:
+    name: Scrape + Retrain
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
     steps:
-      - name: checkout repo content
-        uses: actions/checkout@v4 # checkout the repository content
+      - uses: actions/checkout@v4
 
-      - name: setup python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11' # install the python version needed
-        
-      # add caching 
-      - name: Cache pip dependencies
-        uses: actions/cache@v2
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('./analysis/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
 
-      - name: install python packages
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Scrape and retrain
+        run: uv run python scripts/scrape_and_train.py
+        env:
+          # Use file-based MLflow in CI — no server required
+          MLFLOW_TRACKING_URI: sqlite:///mlflow.db
+          # Override via repo variable (Settings → Variables → Actions → SUUMO_URL)
+          SUUMO_URL: ${{ vars.SUUMO_URL }}
+          MODELS_TO_RETRAIN: ${{ inputs.models_to_retrain || 'challenger,passed' }}
+          PAGES: ${{ inputs.pages || '0,50' }}
+
+      - name: Upload scraped dataset
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraped-data-${{ github.run_id }}
+          path: api/dataset_versions/
+          retention-days: 30
+
+      - name: Upload trained models
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-models-${{ github.run_id }}
+          path: |
+            api/models/passed-model.joblib
+            api/models/challenger-model.joblib
+          retention-days: 30
+
+      - name: Summary
+        if: always()
         run: |
-          python -m pip install --upgrade pip
-          pip install -r ./analysis/requirements.txt
-
-      - name: execute challenger py script
-        run: python ./analysis/challenger_model.py
-
-      - name: execute py script 
-        run: python ./analysis/reg_model.py
-
-      # add model validation step
-        
-      # deploy model - using bentoml - separate this into a different pipeline
-      - name: execute bentoml script 
-        run: python ./analysis/bentoml_serve.py
-
-      # add notifications
-      - name: Send a slack notification
-        uses: xxxxxxxxxxxxxxxxxxxxxxxxxx@xx
-        with:
-          status: ${{ job.status }}
-          text: "The model has been retrained and deployed successfully"
-          author_name: "retrain_model_pipeline"
-          author_icon: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
-          footer: "retrain_model_pipeline"
-          ts: ${{ github.run_id }}
-          channel: "general"
-          username: "retrain_model_pipeline"
-          icon_emoji: ":robot:"
-          color: good
-        
+          echo "## Model Retraining Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Models**: ${{ inputs.models_to_retrain || 'challenger,passed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pages**: ${{ inputs.pages || '0,50' }}" >> $GITHUB_STEP_SUMMARY

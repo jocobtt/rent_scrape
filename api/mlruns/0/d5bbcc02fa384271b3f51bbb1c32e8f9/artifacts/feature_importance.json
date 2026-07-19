@@ -1,0 +1,62 @@
+[
+  {
+    "name": "sqr_m",
+    "importance": 0.0
+  },
+  {
+    "name": "rei_price",
+    "importance": 0.0
+  },
+  {
+    "name": "shikikin",
+    "importance": 0.0
+  },
+  {
+    "name": "floor",
+    "importance": 0.0
+  },
+  {
+    "name": "maintenence_price",
+    "importance": 0.0
+  },
+  {
+    "name": "contract_type",
+    "importance": 0.0
+  },
+  {
+    "name": "year_built",
+    "importance": 0.0
+  },
+  {
+    "name": "nearest_eki_walk",
+    "importance": 0.0
+  },
+  {
+    "name": "ku_name_-",
+    "importance": 0.0
+  },
+  {
+    "name": "apartment_type_1K",
+    "importance": 0.0
+  },
+  {
+    "name": "apartment_type_1LDK",
+    "importance": 0.0
+  },
+  {
+    "name": "apartment_type_2LDK",
+    "importance": 0.0
+  },
+  {
+    "name": "apartment_type_\u30ef\u30f3\u30eb\u30fc\u30e0",
+    "importance": 0.0
+  },
+  {
+    "name": "house_type_\u8cc3\u8cb8\u30a2\u30d1\u30fc\u30c8",
+    "importance": 0.0
+  },
+  {
+    "name": "house_type_\u8cc3\u8cb8\u30de\u30f3\u30b7\u30e7\u30f3",
+    "importance": 0.0
+  }
+]

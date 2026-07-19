@@ -9,3 +9,4 @@ use.plan
 .terraform.lock.hcl
 terraform.tfstate*
 *api_venv
+__pycache__

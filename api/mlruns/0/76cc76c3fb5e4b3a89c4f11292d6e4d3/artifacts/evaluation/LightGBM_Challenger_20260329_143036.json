@@ -1,0 +1,81 @@
+{
+  "model_name": "LightGBM_Challenger",
+  "timestamp": "2026-03-29T14:30:36.798061",
+  "data_shape": {
+    "train_samples": 6,
+    "train_features": 15,
+    "test_samples": 2
+  },
+  "cross_validation": {
+    "cv_folds": 5,
+    "metrics": {
+      "rmse_mean": NaN,
+      "rmse_std": NaN,
+      "mae_mean": NaN,
+      "mae_std": NaN,
+      "r2_mean": NaN,
+      "r2_std": NaN,
+      "train_rmse_mean": NaN,
+      "train_r2_mean": NaN,
+      "overfitting_gap_rmse": NaN,
+      "overfitting_gap_r2": NaN
+    },
+    "fold_results": []
+  },
+  "learning_curves": {
+    "train_sizes": [],
+    "train_scores": {
+      "mean": [],
+      "std": []
+    },
+    "val_scores": {
+      "mean": [],
+      "std": []
+    },
+    "diagnosis": {
+      "final_train_rmse": NaN,
+      "final_val_rmse": NaN,
+      "generalization_gap": 0.0,
+      "status": "insufficient_data"
+    }
+  },
+  "test_set": {
+    "metrics": {
+      "rmse": NaN,
+      "mae": NaN,
+      "mse": NaN,
+      "median_ae": NaN,
+      "mape": NaN,
+      "r2": NaN,
+      "max_error": NaN,
+      "mean_error": NaN,
+      "std_error": NaN,
+      "pct_within_5pct": NaN,
+      "pct_within_10pct": NaN,
+      "pct_within_20pct": NaN
+    },
+    "residual_analysis": {}
+  },
+  "train_set": {
+    "metrics": {
+      "rmse": NaN,
+      "mae": NaN,
+      "mse": NaN,
+      "median_ae": NaN,
+      "mape": NaN,
+      "r2": NaN,
+      "max_error": NaN,
+      "mean_error": NaN,
+      "std_error": NaN,
+      "pct_within_5pct": NaN,
+      "pct_within_10pct": NaN,
+      "pct_within_20pct": NaN
+    }
+  },
+  "summary": {
+    "cross_validation_rmse": "N/A (insufficient data)",
+    "cross_validation_r2": "N/A (insufficient data)",
+    "overfitting_status": "N/A",
+    "recommendation": "Insufficient data for evaluation (6 samples)."
+  }
+}

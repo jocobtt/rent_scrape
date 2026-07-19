@@ -1,0 +1,25 @@
+{
+  "hash": "bd44d82252d31ab27b4c931727587d2a4b884ddf117ef5836f4d55a6a59c12ae",
+  "hash_short": "bd44d82252d3",
+  "created_at": "2026-03-29T18:16:39.940947+00:00",
+  "source_description": "Suumo scrape 2026-03-29 url=https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=030&bs=040&pc=30&smk=&po1=25&po2=99&tc=0400101&tc=0400201&tc=0400301&tc=0400401&tc=0400501&tc=0400601&tc=0400701&tc=0400801&tc=0400901&tc=0401001&tc=0401101",
+  "n_rows": 8,
+  "n_cols": 13,
+  "columns": [
+    "rent_price",
+    "address",
+    "sqr_m",
+    "rei_price",
+    "shikikin",
+    "house_type",
+    "floor",
+    "ku_name",
+    "apartment_type",
+    "maintenence_price",
+    "contract_type",
+    "year_built",
+    "nearest_eki_walk"
+  ],
+  "data_path": "/Users/jacobbraswell/apps/rent_scrape/api/dataset_versions/bd44d82252d3/data.csv",
+  "manifest_path": "/Users/jacobbraswell/apps/rent_scrape/api/dataset_versions/bd44d82252d3/manifest.json"
+}

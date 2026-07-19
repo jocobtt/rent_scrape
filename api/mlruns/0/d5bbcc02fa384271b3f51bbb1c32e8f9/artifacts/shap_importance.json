@@ -1,0 +1,62 @@
+[
+  {
+    "name": "sqr_m",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "rei_price",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "shikikin",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "floor",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "maintenence_price",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "contract_type",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "year_built",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "nearest_eki_walk",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "ku_name_-",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "apartment_type_1K",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "apartment_type_1LDK",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "apartment_type_2LDK",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "apartment_type_\u30ef\u30f3\u30eb\u30fc\u30e0",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "house_type_\u8cc3\u8cb8\u30a2\u30d1\u30fc\u30c8",
+    "mean_abs_shap": 0.0
+  },
+  {
+    "name": "house_type_\u8cc3\u8cb8\u30de\u30f3\u30b7\u30e7\u30f3",
+    "mean_abs_shap": 0.0
+  }
+]
