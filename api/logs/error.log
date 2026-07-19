@@ -146,3 +146,11 @@ Feature names seen at fit time, yet now missing:
 [31m[2026-07-19 15:28:39] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
 [31m[2026-07-19 15:28:39] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
 [31m[2026-07-19 15:28:39] [ERROR   ] [services.training_service][0m Data quality gate failed: ['Too few listings to train on: 2 (minimum 5)', '>50% of rent_price values are 0 (100%) — scrape likely broken', '>60% of sqr_m values are 0 (100%) — scrape likely broken']
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [services.training_service][0m Data quality gate failed: ['Too few listings to train on: 2 (minimum 5)', '>50% of rent_price values are 0 (100%) — scrape likely broken', '>60% of sqr_m values are 0 (100%) — scrape likely broken']

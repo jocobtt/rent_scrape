@@ -1021,3 +1021,65 @@ Feature names seen at fit time, yet now missing:
 [33m[2026-07-19 15:28:39] [WARNING ] [utils.scrape_data][0m [DataQuality] Very few listings parsed: 1
 [33m[2026-07-19 15:28:39] [WARNING ] [services.training_service][0m Data quality warnings: ['Very few listings parsed: 2', '>10% of rent_price values are 0 — possible parse failure', '>20% of sqr_m values are 0']
 [31m[2026-07-19 15:28:39] [ERROR   ] [services.training_service][0m Data quality gate failed: ['Too few listings to train on: 2 (minimum 5)', '>50% of rent_price values are 0 (100%) — scrape likely broken', '>60% of sqr_m values are 0 (100%) — scrape likely broken']
+[32m[2026-07-19 15:38:50] [INFO    ] [root][0m Logging configured
+[32m[2026-07-19 15:38:50] [INFO    ] [services.mlflow_service][0m MLflow tracking URI: file:///tmp/mlruns
+[32m[2026-07-19 15:38:50] [INFO    ] [services.data_capture_service][0m Initialized DataCaptureService with storage at prediction_logs
+[32m[2026-07-19 15:38:50] [INFO    ] [services.ab_testing_service][0m ABTestingService initialized
+[32m[2026-07-19 15:38:50] [INFO    ] [services.auto_promotion_service][0m AutoPromotionService initialized
+[32m[2026-07-19 15:38:50] [INFO    ] [services.monitoring_reports][0m Loading reference data for drift monitoring...
+[32m[2026-07-19 15:38:50] [INFO    ] [services.drift_monitoring_service][0m Loading reference data from Huggingface dataset
+[32m[2026-07-19 15:38:51] [INFO    ] [services.drift_monitoring_service][0m Loaded 900 reference samples with 8 columns
+[32m[2026-07-19 15:38:51] [INFO    ] [services.drift_monitoring_service][0m Initialized DriftMonitoringService with 900 reference samples
+[32m[2026-07-19 15:38:51] [INFO    ] [services.data_capture_service][0m Initialized DataCaptureService with storage at prediction_logs
+[32m[2026-07-19 15:38:51] [INFO    ] [services.monitoring_reports][0m MonitoringReportsManager initialized
+[32m[2026-07-19 15:38:51] [INFO    ] [services.auto_promotion_service][0m AutoPromotionService initialized
+[32m[2026-07-19 15:38:51] [INFO    ] [services.auto_retrain_service][0m AutoRetrainService initialized
+[32m[2026-07-19 15:38:51] [INFO    ] [services.model_loader][0m Loading joblib model from /Users/jacobbraswell/apps/rent_scrape/api/services/../models/challenger-model.joblib
+[32m[2026-07-19 15:38:51] [INFO    ] [services.model_loader][0m Loading joblib model from /Users/jacobbraswell/apps/rent_scrape/api/services/../models/passed-model.joblib
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m GET / - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m GET /health - 200
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m GET /startup - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [services.mlflow_service][0m MLflow error getting model metadata: Registered Model with name=tokyo_rent_lgbm not found
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m GET /ready - 503
+[33m[2026-07-19 15:38:51] [WARNING ] [middleware.logging_middleware][0m POST /predict - 422
+[33m[2026-07-19 15:38:51] [WARNING ] [middleware.logging_middleware][0m POST /predict - 422
+[33m[2026-07-19 15:38:51] [WARNING ] [middleware.logging_middleware][0m POST /predict - 422
+[33m[2026-07-19 15:38:51] [WARNING ] [middleware.logging_middleware][0m POST /predict - 422
+[33m[2026-07-19 15:38:51] [WARNING ] [middleware.logging_middleware][0m POST /predict - 422
+[33m[2026-07-19 15:38:51] [WARNING ] [middleware.logging_middleware][0m POST /predict - 422
+[33m[2026-07-19 15:38:51] [WARNING ] [middleware.logging_middleware][0m POST /predict - 422
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m POST /predict - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m POST /challenger_predict - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m POST /compare_predictions - 503
+[31m[2026-07-19 15:38:51] [ERROR   ] [middleware.logging_middleware][0m GET /ensemble/methods - 503
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m POST /predict - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m POST /predict - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m POST /challenger_predict - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m POST /challenger_predict - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m POST /compare_predictions - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m POST /predict - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m POST /challenger_predict - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m POST /compare_predictions - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m GET /model_info - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m GET /model_info - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m GET /model_info - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m GET /model_info - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m GET /ab-test/list - 200
+[32m[2026-07-19 15:38:51] [INFO    ] [services.ab_testing_service][0m Created experiment: ci_test_experiment
+[32m[2026-07-19 15:38:51] [INFO    ] [middleware.logging_middleware][0m POST /ab-test/create - 200
+[33m[2026-07-19 15:38:51] [WARNING ] [middleware.logging_middleware][0m POST /ab-test/create - 422
+[33m[2026-07-19 15:38:51] [WARNING ] [middleware.logging_middleware][0m POST /ab-test/create - 422
+[33m[2026-07-19 15:38:51] [WARNING ] [middleware.logging_middleware][0m POST /ab-test/create - 422
+[32m[2026-07-19 15:38:51] [INFO    ] [utils.scrape_data][0m Scrape complete: 1 listings parsed, 0 failed, 1 pages
+[32m[2026-07-19 15:38:51] [INFO    ] [utils.scrape_data][0m Scrape complete: 0 listings parsed, 0 failed, 1 pages
+[33m[2026-07-19 15:38:51] [WARNING ] [utils.scrape_data][0m Page 0 request failed: timeout
+[33m[2026-07-19 15:38:51] [WARNING ] [utils.scrape_data][0m Page 1 request failed: timeout
+[32m[2026-07-19 15:38:51] [INFO    ] [utils.scrape_data][0m Scrape complete: 0 listings parsed, 0 failed, 2 pages
+[32m[2026-07-19 15:38:51] [INFO    ] [utils.scrape_data][0m Scrape complete: 1 listings parsed, 0 failed, 1 pages
+[33m[2026-07-19 15:38:51] [WARNING ] [utils.scrape_data][0m [DataQuality] Very few listings parsed: 1
+[32m[2026-07-19 15:38:51] [INFO    ] [utils.scrape_data][0m Scrape complete: 1 listings parsed, 0 failed, 1 pages
+[33m[2026-07-19 15:38:51] [WARNING ] [utils.scrape_data][0m [DataQuality] Very few listings parsed: 1
+[32m[2026-07-19 15:38:51] [INFO    ] [utils.scrape_data][0m Scrape complete: 1 listings parsed, 0 failed, 1 pages
+[33m[2026-07-19 15:38:51] [WARNING ] [utils.scrape_data][0m [DataQuality] Very few listings parsed: 1
+[33m[2026-07-19 15:38:51] [WARNING ] [services.training_service][0m Data quality warnings: ['Very few listings parsed: 2', '>10% of rent_price values are 0 — possible parse failure', '>20% of sqr_m values are 0']
+[31m[2026-07-19 15:38:51] [ERROR   ] [services.training_service][0m Data quality gate failed: ['Too few listings to train on: 2 (minimum 5)', '>50% of rent_price values are 0 (100%) — scrape likely broken', '>60% of sqr_m values are 0 (100%) — scrape likely broken']
