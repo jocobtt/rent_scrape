@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Model files (if you want to keep them separate)
+# Uncomment if models are managed outside the container
+# *.joblib
+# *.pkl
+# *.h5
+
+# MLflow local runs (will use volume)
+mlruns/
+mlartifacts/
+
+# Environment files
+.env
+.env.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Logs
+*.log
+logs/
+
+# Scripts (optional - comment out if needed in container)
+start_api.sh
+run_tests.sh
+
+# Test files (optional - comment out if needed in container)
+tests/
+test_*.py
+*_test.py

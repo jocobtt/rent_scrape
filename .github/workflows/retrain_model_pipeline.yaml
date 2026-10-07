@@ -1,0 +1,75 @@
+name: Automated Model Retraining
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_retrain:
+        description: 'Force retraining even if conditions are not met'
+        required: false
+        default: 'false'
+        type: boolean
+      models_to_retrain:
+        description: 'Models to retrain (comma-separated: challenger,passed)'
+        required: false
+        default: 'challenger,passed'
+      pages:
+        description: 'Page range to scrape (start,end — e.g. 0,50)'
+        required: false
+        default: '0,50'
+  schedule:
+    # Run every month on the 1st at 2 AM UTC
+    - cron: '0 2 1 * *'
+
+jobs:
+  retrain-models:
+    name: Scrape + Retrain
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Scrape and retrain
+        run: uv run python scripts/scrape_and_train.py
+        env:
+          # Use file-based MLflow in CI — no server required
+          MLFLOW_TRACKING_URI: sqlite:///mlflow.db
+          # Override via repo variable (Settings → Variables → Actions → SUUMO_URL)
+          SUUMO_URL: ${{ vars.SUUMO_URL }}
+          MODELS_TO_RETRAIN: ${{ inputs.models_to_retrain || 'challenger,passed' }}
+          PAGES: ${{ inputs.pages || '0,50' }}
+
+      - name: Upload scraped dataset
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraped-data-${{ github.run_id }}
+          path: api/dataset_versions/
+          retention-days: 30
+
+      - name: Upload trained models
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-models-${{ github.run_id }}
+          path: |
+            api/models/passed-model.joblib
+            api/models/challenger-model.joblib
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Model Retraining Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Models**: ${{ inputs.models_to_retrain || 'challenger,passed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pages**: ${{ inputs.pages || '0,50' }}" >> $GITHUB_STEP_SUMMARY
