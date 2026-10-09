@@ -224,7 +224,7 @@ jobs:
           extra_args: --debug --only-verified
 
       - name: GitLeaks Action
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}} # Only required for Organizations. Not required for individual developers.
