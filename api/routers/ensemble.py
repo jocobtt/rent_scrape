@@ -1,4 +1,6 @@
 """Ensemble predictions (weighted, stacking, voting), confidence and batch."""
+import time
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app_state import S
@@ -38,25 +40,22 @@ async def predict_with_ensemble(request: Request, data: EnsemblePredictRequest):
                 detail="Ensemble prediction service not available - models not loaded"
             )
         
-        result = S.ensemble_prediction_service.predict_with_ensemble(
-            _require_terms(data.input_data), 
-            data.method
-        )
-        
+        input_dict = _require_terms(data.input_data)
+        started = time.perf_counter()
+        result = S.ensemble_prediction_service.predict_with_ensemble(input_dict, data.method)
+        duration_ms = (time.perf_counter() - started) * 1000
+
         # Log prediction for monitoring
-        with PerformanceLogger("ensemble_prediction") as perf:
-            pass
-        
-        log_prediction(
-            get_request_id(), 
-            _require_terms(data.input_data), 
-            result,
-            f"ensemble_{data.method}",
-            perf.duration
-        )
-        
+        log_prediction(logger, f"ensemble_{data.method}", input_dict, result.get("prediction"), duration_ms,
+                       get_request_id(request))
+        S.data_capture_service.log_prediction(
+            model_type=f"ensemble_{data.method}", input_features=input_dict,
+            prediction=result.get("prediction"), source="api")
+
         return result
         
+    except HTTPException:
+        raise  # e.g. the 422 from _require_terms
     except ValueError as e:
         logger.warning(f"Invalid ensemble method: {str(e)}")
         raise HTTPException(
@@ -97,12 +96,10 @@ async def compare_all_predictions(request: Request, data: InputData):
         
         result = S.ensemble_prediction_service.compare_all_predictions(_require_terms(data))
         
-        # Log comparison for monitoring
-        with PerformanceLogger("ensemble_comparison") as perf:
-            pass
-        
         return result
         
+    except HTTPException:
+        raise  # e.g. the 422 from _require_terms
     except Exception as e:
         logger.error(f"Ensemble comparison error: {str(e)}")
         raise HTTPException(
@@ -140,6 +137,8 @@ async def get_prediction_confidence(request: Request, data: InputData):
         
         return result
         
+    except HTTPException:
+        raise  # e.g. the 422 from _require_terms
     except Exception as e:
         logger.error(f"Confidence calculation error: {str(e)}")
         raise HTTPException(
@@ -176,6 +175,8 @@ async def get_model_recommendations(request: Request, data: InputData):
         
         return result
         
+    except HTTPException:
+        raise  # e.g. the 422 from _require_terms
     except Exception as e:
         logger.error(f"Model recommendations error: {str(e)}")
         raise HTTPException(
@@ -226,6 +227,8 @@ async def batch_predict(request: Request, data: BatchPredictRequest):
             "error_count": len([r for r in result if r.get("status") == "failed"])
         }
         
+    except HTTPException:
+        raise  # e.g. the 422 from _require_terms
     except Exception as e:
         logger.error(f"Batch prediction error: {str(e)}")
         raise HTTPException(
@@ -292,8 +295,10 @@ async def train_ensemble_models(request: Request):
         from models.ensemble_model import train_ensemble_models
 
         # Train all ensemble methods
-        with PerformanceLogger("ensemble_training") as perf:
+        started = time.perf_counter()
+        with PerformanceLogger("ensemble_training", logger):
             results = train_ensemble_models()
+        training_seconds = time.perf_counter() - started
         
         if not results:
             raise HTTPException(
@@ -303,7 +308,7 @@ async def train_ensemble_models(request: Request):
         
         # Prepare response
         response = {
-            "training_duration": perf.duration,
+            "training_duration": training_seconds,
             "models_trained": list(results.keys()),
             "results": {}
         }
@@ -321,7 +326,7 @@ async def train_ensemble_models(request: Request):
         response["best_method"] = best_method
         response["best_rmse"] = results[best_method]["metrics"]["rmse"]
         
-        logger.info(f"Ensemble training completed in {perf.duration:.2f}s. Best method: {best_method}")
+        logger.info(f"Ensemble training completed in {training_seconds:.2f}s. Best method: {best_method}")
         
         return response
         

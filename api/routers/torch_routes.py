@@ -24,9 +24,9 @@ async def predict_with_torch_model(request: Request, data: TorchPredictRequest):
     - **model_name**: Name of the PyTorch model (e.g., 'tabular', 'ensemble', 'transformer')
     - **input_data**: Apartment features for prediction
     """
-    with PerformanceLogger("torch_prediction"):
+    with PerformanceLogger("torch_prediction", logger):
         try:
-            request_id = get_request_id()
+            request_id = get_request_id(request)
             
             if S.torch_prediction_service is None:
                 logger.warning("PyTorch prediction service not available")
@@ -36,36 +36,21 @@ async def predict_with_torch_model(request: Request, data: TorchPredictRequest):
                 )
             
             # Make prediction
-            result = S.torch_prediction_service.predict_with_torch_model(
-                _require_terms(data.input_data), 
-                data.model_name
-            )
-            
+            input_dict = _require_terms(data.input_data)
+            result = S.torch_prediction_service.predict_with_torch_model(input_dict, data.model_name)
+
             # Log prediction for monitoring
-            log_prediction(
-                input_data=_require_terms(data.input_data),
-                prediction=result["prediction"],
-                model_name=f"torch_{data.model_name}",
-                request_id=request_id,
-                processing_time_ms=result.get("processing_time_ms", 0)
-            )
-            
-            # Capture data for monitoring
-            await S.data_capture_service.capture_prediction(
-                input_data=_require_terms(data.input_data),
-                prediction=result["prediction"],
-                model_name=f"torch_{data.model_name}",
-                model_version="1.0",
-                request_metadata={
-                    "request_id": request_id,
-                    "endpoint": "/torch/predict",
-                    "framework": "pytorch"
-                }
-            )
-            
+            log_prediction(logger, f"torch_{data.model_name}", input_dict, result["prediction"],
+                           result.get("processing_time_ms", 0), request_id)
+            S.data_capture_service.log_prediction(
+                model_type=f"torch_{data.model_name}", input_features=input_dict,
+                prediction=result["prediction"], source="api")
+
             result["request_id"] = request_id
             return result
             
+        except HTTPException:
+            raise  # e.g. the 422 from _require_terms
         except ValueError as e:
             logger.warning(f"PyTorch prediction validation error: {e}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -118,6 +103,8 @@ async def get_torch_model_recommendations(request: Request, data: InputData):
         recommendations = S.torch_prediction_service.get_torch_model_recommendations(_require_terms(data))
         return recommendations
         
+    except HTTPException:
+        raise  # e.g. the 422 from _require_terms
     except Exception as e:
         logger.error(f"Error generating PyTorch recommendations: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
@@ -144,6 +131,8 @@ async def compare_all_models_with_torch(request: Request, data: InputData):
         result = S.torch_prediction_service.compare_all_predictions_with_torch(_require_terms(data))
         return result
         
+    except HTTPException:
+        raise  # e.g. the 422 from _require_terms
     except Exception as e:
         logger.error(f"Error comparing all models: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
@@ -181,6 +170,8 @@ async def batch_predict_torch(request: Request, data: TorchBatchPredictRequest):
             "model_name": data.model_name
         }
         
+    except HTTPException:
+        raise  # e.g. the 422 from _require_terms
     except Exception as e:
         logger.error(f"Error in PyTorch batch prediction: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
