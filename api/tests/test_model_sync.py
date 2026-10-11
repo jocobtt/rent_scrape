@@ -137,8 +137,10 @@ def test_sync_all_variants_and_status(env, monkeypatch):
 
 def test_refresh_reloads_services_only_when_something_changed(monkeypatch):
     import model_api
+    import model_runtime
+    from app_state import S
     monkeypatch.setenv("MODEL_SYNC", "1")
-    before = model_api.prediction_service
+    before = S.prediction_service
     calls = []
 
     def fake_sync(models_dir):
@@ -146,43 +148,49 @@ def test_refresh_reloads_services_only_when_something_changed(monkeypatch):
         return {"challenger": {"action": "unchanged"}}
 
     monkeypatch.setattr(model_sync, "sync_production_models", fake_sync)
-    out = model_api.refresh_models_from_registry(force=True)
-    assert out["status"] == "ok" and out["updated"] == [] and model_api.prediction_service is before
+    out = model_runtime.refresh_models_from_registry(force=True)
+    assert out["status"] == "ok" and out["updated"] == [] and S.prediction_service is before
 
     monkeypatch.setattr(model_sync, "sync_production_models", lambda d: {"challenger": {"action": "updated"}})
     reloaded = []
-    monkeypatch.setattr(model_api, "_reload_models", lambda: reloaded.append(1))
-    assert model_api.refresh_models_from_registry(force=True)["updated"] == ["challenger"] and reloaded == [1]
+    monkeypatch.setattr(model_runtime, "_reload_models", lambda: reloaded.append(1))
+    assert model_runtime.refresh_models_from_registry(force=True)["updated"] == ["challenger"] and reloaded == [1]
 
 
 def test_refresh_is_throttled_disabled_and_never_raises(monkeypatch):
     import model_api
+    import model_runtime
+    from app_state import S
     monkeypatch.setenv("MODEL_SYNC", "0")
-    assert model_api.refresh_models_from_registry(force=True)["status"] == "disabled"
+    assert model_runtime.refresh_models_from_registry(force=True)["status"] == "disabled"
     monkeypatch.setenv("MODEL_SYNC", "1")
     monkeypatch.setattr(model_sync, "sync_production_models", lambda d: 1 / 0)
-    assert model_api.refresh_models_from_registry(force=True)["status"] == "error"
-    monkeypatch.setattr(model_api, "_model_sync_last", [model_api.time.monotonic()])
-    assert model_api.refresh_models_from_registry()["status"] == "skipped"
+    assert model_runtime.refresh_models_from_registry(force=True)["status"] == "error"
+    monkeypatch.setattr(model_runtime, "_model_sync_last", [model_runtime.time.monotonic()])
+    assert model_runtime.refresh_models_from_registry()["status"] == "skipped"
 
 
 def test_reload_builds_services_from_disk_and_survives_a_bad_reload(client, monkeypatch):
     import model_api
+    import model_runtime
+    from app_state import S
     client.get("/health")  # lets the middleware load models
-    model_api._reload_models()
-    assert model_api.prediction_service is not None and model_api.ensemble_prediction_service is not None
-    old = model_api.prediction_service
-    monkeypatch.setattr(model_api.model_loader, "load_model",
+    model_runtime._reload_models()
+    assert S.prediction_service is not None and S.ensemble_prediction_service is not None
+    old = S.prediction_service
+    monkeypatch.setattr(S.model_loader, "load_model",
                         lambda name, **k: (_ for _ in ()).throw(FileNotFoundError(name)))
     with pytest.raises(RuntimeError):
-        model_api._reload_models()
-    assert model_api.prediction_service is old  # the running service was not replaced
+        model_runtime._reload_models()
+    assert S.prediction_service is old  # the running service was not replaced
 
 
 def test_promote_endpoint_reports_what_is_now_served(client, admin_headers, monkeypatch):
     import model_api
-    monkeypatch.setattr(model_api.auto_promotion_service, "promote_specific_version",
+    import model_runtime
+    from app_state import S
+    monkeypatch.setattr(S.auto_promotion_service, "promote_specific_version",
                         lambda m, v, f: {"promoted": True, "model_name": m, "version": v})
-    monkeypatch.setattr(model_api, "refresh_models_from_registry", lambda force=False: {"status": "ok", "updated": ["challenger"]})
+    monkeypatch.setattr(model_runtime, "refresh_models_from_registry", lambda force=False: {"status": "ok", "updated": ["challenger"]})
     r = client.post("/models/tokyo_rent_lgbm/promote/9", headers=admin_headers)
     assert r.status_code == 200 and r.json()["serving"]["updated"] == ["challenger"]

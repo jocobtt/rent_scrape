@@ -8,7 +8,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import model_api
+import model_api  # noqa: F401  (imports the app)
+from app_state import S
+from deps import limiter
+from services.ab_testing_service import ABTestingService
 import services.monitoring_reports as mr
 from services.auto_retrain_service import AutoRetrainService
 from services.data_capture_service import DataCaptureService
@@ -35,19 +38,19 @@ def listing(rng, shift=0.0, terms=True, address=False):
 def stack(client, tmp_path, monkeypatch):
     """Isolated capture / monitoring / A-B state; the real models and prediction service."""
     client.get("/health")  # let the middleware load the committed models
-    monkeypatch.setattr(model_api.limiter, "enabled", False)
+    monkeypatch.setattr(limiter, "enabled", False)
     capture = DataCaptureService(storage_dir=str(tmp_path / "logs"), buffer_size=1000)
-    monkeypatch.setattr(model_api, "data_capture_service", capture)
+    monkeypatch.setattr(S, "data_capture_service", capture)
 
     rng = np.random.default_rng(0)
     reference = pd.DataFrame([listing(rng) for _ in range(1500)])
     monkeypatch.setattr(mr, "load_reference_data", lambda path=None: reference)
     manager = MonitoringReportsManager(reports_dir=str(tmp_path / "reports"), predictions_dir=str(tmp_path / "logs"))
     manager.data_capture = capture
-    monkeypatch.setattr(model_api, "monitoring_manager", manager)
+    monkeypatch.setattr(S, "monitoring_manager", manager)
 
-    ab = model_api.ABTestingService(str(tmp_path / "exp"), str(tmp_path / "res"))
-    monkeypatch.setattr(model_api, "ab_testing_service", ab)
+    ab = ABTestingService(str(tmp_path / "exp"), str(tmp_path / "res"))
+    monkeypatch.setattr(S, "ab_testing_service", ab)
     return SimpleNamespace(capture=capture, manager=manager, rng=rng, ab=ab)
 
 
@@ -130,8 +133,8 @@ def label_everything(stack, error):
 def retrain_service(stack, registry, monkeypatch):
     import services.auto_retrain_service as ars
     monkeypatch.setattr(ars, "TrainingService", lambda: None)
-    monkeypatch.setattr(ars, "AutoPromotionService", lambda: model_api.auto_promotion_service)
-    monkeypatch.setattr(model_api.auto_promotion_service, "client", registry)
+    monkeypatch.setattr(ars, "AutoPromotionService", lambda: S.auto_promotion_service)
+    monkeypatch.setattr(S.auto_promotion_service, "client", registry)
     monkeypatch.setattr(ars, "MonitoringReportsManager", lambda: stack.manager)
     import services.data_capture_service as dcs
     monkeypatch.setattr(dcs, "DataCaptureService", lambda *a, **k: stack.capture)
@@ -156,7 +159,7 @@ def test_retrain_stays_quiet_when_healthy_and_fires_on_degradation(client, stack
 
 def test_promotion_and_sla_checks_run_against_a_registry(client, stack, admin_headers, monkeypatch):
     registry = FakeRegistry()
-    monkeypatch.setattr(model_api.auto_promotion_service, "client", registry)
+    monkeypatch.setattr(S.auto_promotion_service, "client", registry)
     r = client.post("/models/check-promotion?dry_run=true", headers=admin_headers)
     assert r.status_code == 200 and r.json()["status"] == "success"
 

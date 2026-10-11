@@ -126,7 +126,13 @@ Data Scraping (Suumo) → Model Training → MLflow Registry
 
 ```
 api/
-├── model_api.py              # Main FastAPI app (40+ endpoints)
+├── model_api.py              # App assembly: middleware, services, includes the routers (entrypoint `model_api:app`)
+├── routers/                  # Endpoints by area: health, predictions, training, models (promotion/serving/SLA),
+│                             #   ensemble, monitoring, ab_testing, torch_routes, explain, lineage
+├── schemas.py                # Request models shared by the routers (InputData, ...)
+├── deps.py                   # Rate limiter, admin-key guard, rate-limit tiers
+├── app_state.py              # `S`: the service singletons routers read at call time (tests patch S.<service>)
+├── model_runtime.py          # Loads served models, registry sync and reload, the model-loading middleware
 ├── scheduled_tasks.py        # Automated tasks (promotion, drift, monitoring)
 ├── models/                   # Model training scripts & artifacts
 │   ├── challenger_model.py   # LightGBM training + auto-promotion
