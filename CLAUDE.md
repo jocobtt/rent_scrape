@@ -322,6 +322,10 @@ MLFLOW_TRACKING_URI=http://localhost:5001
 - Random: Random assignment per request → Use for anonymous users
 - Shadow mode: Both models predict, only control returned → Safe testing
 
+**SLA demotion (`services/sla_service.py`):** floors are derived from `PROMOTION_THRESHOLDS` (RMSE x1.25, R² -0.08, MAPE x1.5), in 万円 like the logged metrics. A Production model breaching one is demoted to Staging.
+
+**Drift (`services/drift_monitoring_service.py`):** Evidently's `ValueDrift` returns a distance per column and flags drift when it exceeds the method's threshold (0.1 by default). Columns that are entirely empty (e.g. every logged request omitted deposit / key money) are skipped; optional deposit / key money gaps are not a data-quality failure. Auto-retrain compares each model's recent MAE with the MAE of its Production run in MLflow, retrains the no-terms variants with their family, and honours `min_days_between_retrains`.
+
 **Drift Detection Triggers:**
 - Data drift: Distribution shifts in input features (statistical tests)
 - Prediction drift: Model output distribution changes

@@ -30,6 +30,12 @@ from evidently.tests import lte
 
 logger = logging.getLogger(__name__)
 
+# Evidently's ValueDrift reports a *distance* per column (normed Wasserstein, Jensen-Shannon, ...) and
+# flags drift when it EXCEEDS the method's threshold (0.1 by default). Larger = more drift.
+DEFAULT_DRIFT_THRESHOLD = 0.1
+# Deposit / key money are optional request fields, so they are legitimately missing in prediction logs
+OPTIONAL_COLUMNS = ("rei_price", "shikikin")
+
 
 class DriftMonitoringService:
     """Service for monitoring data and prediction drift using Evidently AI"""
@@ -70,9 +76,16 @@ class DriftMonitoringService:
     # Dataset helpers
     # ------------------------------------------------------------------
 
-    def _make_feature_dataset(self, df: pd.DataFrame) -> Dataset:
+    def _usable_columns(self, current: pd.DataFrame) -> List[str]:
+        """Feature columns that can be compared: present in both frames and not entirely empty in either.
+        (Evidently raises on an all-NaN column, e.g. when every logged request omitted deposit / key money.)"""
+        ref = self.reference_data
+        return [c for c in self.feature_columns
+                if c in ref.columns and c in current.columns and ref[c].notna().any() and current[c].notna().any()]
+
+    def _make_feature_dataset(self, df: pd.DataFrame, columns: Optional[List[str]] = None) -> Dataset:
         """Wrap a DataFrame in a feature-only DataDefinition (no regression task)."""
-        available = [c for c in self.feature_columns if c in df.columns]
+        available = [c for c in (columns if columns is not None else self.feature_columns) if c in df.columns]
         data_def = DataDefinition(numerical_columns=available)
         return Dataset.from_pandas(df[available], data_definition=data_def)
 
@@ -115,16 +128,19 @@ class DriftMonitoringService:
         current_data: pd.DataFrame,
         save_html: bool = True,
         save_json: bool = True,
+        drift_share_threshold: float = 0.5,
     ) -> Tuple[object, Dict]:
-        """Generate a data drift report.
+        """Generate a data drift report. The dataset counts as drifted when at least
+        `drift_share_threshold` of the compared features drifted.
 
         Returns:
             (snapshot, summary_dict)
         """
         logger.info("Generating data drift report...")
 
-        ref_ds = self._make_feature_dataset(self.reference_data)
-        cur_ds = self._make_feature_dataset(current_data)
+        columns = self._usable_columns(current_data)
+        ref_ds = self._make_feature_dataset(self.reference_data, columns)
+        cur_ds = self._make_feature_dataset(current_data, columns)
 
         report = Report(metrics=[DataDriftPreset()])
         snapshot = report.run(reference_data=ref_ds, current_data=cur_ds)
@@ -141,7 +157,7 @@ class DriftMonitoringService:
             snapshot.save_json(str(json_path))
             logger.info(f"Saved JSON report to {json_path}")
 
-        summary = self._extract_drift_summary(snapshot)
+        summary = self._extract_drift_summary(snapshot, drift_share_threshold)
         logger.info(f"Data drift summary: {summary}")
 
         return snapshot, summary
@@ -244,28 +260,17 @@ class DriftMonitoringService:
         """
         logger.info("Running drift tests...")
 
-        ref_ds = self._make_feature_dataset(self.reference_data)
-        cur_ds = self._make_feature_dataset(current_data)
+        columns = self._usable_columns(current_data)
+        ref_ds = self._make_feature_dataset(self.reference_data, columns)
+        cur_ds = self._make_feature_dataset(current_data, columns)
 
-        # Build per-column ValueDrift metrics with inline pass/fail tests.
-        # A column passes when its drift score (p-value) is NOT below 0.05,
-        # i.e. we assert score >= 0.05 by testing lte(0.05) → FAIL means drifted.
-        # We tolerate up to drift_share_threshold fraction of columns drifting.
-        feature_metrics = [
-            ValueDrift(column=col)
-            for col in self.feature_columns
-            if col in self.reference_data.columns
-        ]
-        report = Report(metrics=feature_metrics + [DatasetMissingValueCount(tests=[lte(0)])])
+        report = Report(metrics=[ValueDrift(column=col) for col in columns])
         snapshot = report.run(reference_data=ref_ds, current_data=cur_ds)
 
-        # Count drifted columns from results
-        drift_summary = self._extract_drift_summary(snapshot)
+        drift_summary = self._extract_drift_summary(snapshot, drift_share_threshold)
         max_drifted = int(drift_share_threshold * len(self.feature_columns))
-        missing_ok = all(
-            tr.status.value == "SUCCESS"
-            for tr in snapshot.tests_results
-        )
+        required = [c for c in self.feature_columns if c in current_data.columns and c not in OPTIONAL_COLUMNS]
+        missing_ok = not bool(current_data[required].isna().any().any())
         tests_passed = drift_summary["drifted_features"] <= max_drifted and missing_ok
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -302,13 +307,13 @@ class DriftMonitoringService:
         drift_info = {"column": column_name, "drift_detected": False, "drift_score": None}
 
         try:
-            for result in snapshot.metric_results.values():
-                dn = getattr(result, "display_name", "")
-                if column_name in dn and "drift" in dn.lower():
-                    score = getattr(result, "value", None)
+            for entry in snapshot.dict().get("metrics", []):
+                if entry.get("config", {}).get("column") == column_name:
+                    score = entry.get("value")
+                    threshold = entry["config"].get("threshold") or DEFAULT_DRIFT_THRESHOLD
                     drift_info["drift_score"] = score
-                    # p-value below 0.05 → drift detected
-                    drift_info["drift_detected"] = score is not None and score < 0.05
+                    drift_info["threshold"] = threshold
+                    drift_info["drift_detected"] = score is not None and score > threshold
                     break
         except Exception as e:
             logger.warning(f"Could not extract column drift metrics: {e}")
@@ -319,30 +324,35 @@ class DriftMonitoringService:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _extract_drift_summary(self, snapshot) -> Dict:
-        """Extract summary statistics from a drift report snapshot.
+    def _extract_drift_summary(self, snapshot, drift_share_threshold: float = 0.5) -> Dict:
+        """Count drifted features in a drift snapshot.
 
-        DataDriftPreset produces a ValueDrift result per column.  A column is
-        considered drifted when its drift score (p-value) is below 0.05.
+        Each ValueDrift result carries a distance and the threshold of the method Evidently chose for
+        that column; a column drifted when distance > threshold.
         """
-        total = len(self.feature_columns)
         summary = {
-            "total_features": total,
+            "total_features": len(self.feature_columns),
             "drifted_features": 0,
             "drift_share": 0.0,
+            "drifted_columns": [],
             "dataset_drift": False,
         }
         try:
-            drifted = 0
-            for result in snapshot.metric_results.values():
-                dn = getattr(result, "display_name", "")
-                if "Value drift for" in dn:
-                    score = getattr(result, "value", None)
-                    if score is not None and score < 0.05:
-                        drifted += 1
-            summary["drifted_features"] = drifted
-            summary["drift_share"] = drifted / total if total else 0.0
-            summary["dataset_drift"] = summary["drift_share"] >= 0.5
+            compared, drifted = [], []
+            for entry in snapshot.dict().get("metrics", []):
+                config = entry.get("config", {})
+                value = entry.get("value")
+                if not str(config.get("type", "")).endswith("ValueDrift") or value is None:
+                    continue
+                compared.append(config.get("column"))
+                if value > (config.get("threshold") or DEFAULT_DRIFT_THRESHOLD):
+                    drifted.append(config.get("column"))
+            if compared:
+                summary["total_features"] = len(compared)
+                summary["drifted_features"] = len(drifted)
+                summary["drift_share"] = len(drifted) / len(compared)
+                summary["drifted_columns"] = drifted
+                summary["dataset_drift"] = summary["drift_share"] >= drift_share_threshold
         except Exception as e:
             logger.warning(f"Could not extract drift summary: {e}")
         return summary

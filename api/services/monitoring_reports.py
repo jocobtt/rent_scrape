@@ -197,6 +197,7 @@ class MonitoringReportsManager:
             current_data=current_data,
             save_html=True,
             save_json=False,
+            drift_share_threshold=drift_threshold,
         )
 
         result = {
