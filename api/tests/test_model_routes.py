@@ -78,3 +78,10 @@ def test_routes_that_need_the_terms_say_422_when_they_are_missing(client, servic
     partial = {k: v for k, v in BODY.items() if k not in ("rei_price", "shikikin")}
     r = client.post(path, json=partial)
     assert r.status_code == 422 and "required for this endpoint" in r.json()["detail"], (path, r.status_code, r.text[:200])
+
+
+def test_feature_importance_is_reported_as_shares_that_sum_to_one():
+    from services.mlflow_service import MLflowService
+    out = MLflowService._normalise_importance([{"name": "a", "importance": 300.0}, {"name": "b", "importance": 100.0}])
+    assert [i["importance"] for i in out] == [0.75, 0.25] and out[0]["name"] == "a"
+    assert MLflowService._normalise_importance([{"name": "a", "importance": 0.0}]) == [{"name": "a", "importance": 0.0}]
