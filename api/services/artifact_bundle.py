@@ -6,7 +6,7 @@ sense together: a model paired with another run's geo state keeps predicting, ju
 state is derived from scraped listings and is not committed, so the features file (which is) records
 what the other two must look like:
 
-    "bundle": {"model_sha256": ..., "geo_sha256": ... | null}
+    "bundle": {"model_sha256": ..., "geo_sha256": ... | null, "run_id": ... | null}
 
 `stamp` writes it at the end of training; `verify` runs when the API loads the variant. A model or geo
 file that does not match raises `BundleMismatch`; a geo file that is absent only warns (the features
@@ -17,7 +17,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import List, Union
+from typing import List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +39,14 @@ def _paths(models_dir: Union[str, Path], variant: str):
     return d / f"{variant}-model.joblib", d / f"{variant}-features.json", d / f"{variant}-geo.json"
 
 
-def stamp(models_dir: Union[str, Path], variant: str) -> dict:
-    """Record the current model and geo-state hashes in `<variant>-features.json`."""
+def stamp(models_dir: Union[str, Path], variant: str, run_id: Optional[str] = None) -> dict:
+    """Record the current model and geo-state hashes in `<variant>-features.json`. `run_id` is the MLflow
+    run that produced the files (services/model_sync.py compares it with the registry's Production run)."""
     model, features, geo = _paths(models_dir, variant)
     with open(features, encoding="utf-8") as f:
         state = json.load(f)
-    state["bundle"] = {"model_sha256": _sha256(model), "geo_sha256": _sha256(geo) if geo.exists() else None}
+    state["bundle"] = {"model_sha256": _sha256(model), "geo_sha256": _sha256(geo) if geo.exists() else None,
+                       "run_id": run_id}
     with open(features, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
     return state["bundle"]

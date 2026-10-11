@@ -28,6 +28,11 @@ NO_TERMS = os.getenv("NO_TERMS") == "1" or "--no-terms" in sys.argv
 VARIANT = "challenger-noterms" if NO_TERMS else "challenger"
 REGISTERED_NAME = "tokyo_rent_lgbm_noterms" if NO_TERMS else "tokyo_rent_lgbm"
 
+# Training writes its files here, never over the ones the API is serving (models/): the registry decides
+# which run is served (services/model_sync.py), and a candidate that is not promoted must not replace it.
+OUT_DIR = os.getenv("MODEL_OUT_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "staging"))
+os.makedirs(OUT_DIR, exist_ok=True)
+
 # Spatial-lag rent features (nearest buildings' rent per m², town encoding; services/geo_features.py).
 # On by default for the no-terms variant, where location helps most; `--no-geo` / GEO_FEATURES=0 disables.
 USE_GEO = NO_TERMS and os.getenv("GEO_FEATURES", "1") != "0" and "--no-geo" not in sys.argv
@@ -51,7 +56,9 @@ def make_model(params):
 TERMS_MASK_FRAC = 0.0 if NO_TERMS else float(os.getenv("TERMS_MASK_FRAC", "0.25"))
 
 # load the data
-def load_data(dataset=None):
+def load_data(dataset=None, seed=42, save=True):
+    """Features and a grouped split. `seed` picks the held-out buildings; `save=False` leaves the
+    on-disk preprocessor / geo files alone (multi-seed evaluation)."""
     import sys as _sys
     _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from services.feature_preprocessor import FeaturePreprocessor, mask_optional_terms
@@ -70,7 +77,7 @@ def load_data(dataset=None):
     y = encoded['rent_price']
     # Hold out whole buildings so near-duplicate units can't leak into the test set
     groups = group_labels(df)
-    X_train, X_test, y_train, y_test, _ = grouped_train_test_split(X, y, groups, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test, _ = grouped_train_test_split(X, y, groups, test_size=0.2, random_state=seed)
     df_for_lineage = attach_groups(encoded.copy(), groups)
     if USE_GEO and groups is not None:
         from services.geo_features import fit_geo_features, mask_geo_features
@@ -81,7 +88,8 @@ def load_data(dataset=None):
         preprocessor.add_geo(geo, f_tr)
         X_train, X_test = pd.concat([X_train, f_tr], axis=1), pd.concat([X_test, f_te], axis=1)
         X_train = mask_geo_features(X_train, GEO_MASK_FRAC)
-    preprocessor.save(os.path.join(os.path.dirname(__file__), f"{VARIANT}-features.json"))
+    if save:
+        preprocessor.save(os.path.join(OUT_DIR, f"{VARIANT}-features.json"))
     # Mask deposit / key money on a quarter of the training rows (0.25 was the best trade-off: see README) so the model also works when the
     # API request omits them. Test data stays complete; no-terms scores are logged separately.
     X_train = mask_optional_terms(X_train, frac=TERMS_MASK_FRAC)
@@ -229,6 +237,18 @@ def train_and_log_model(X_train, X_test, y_train, y_test, params,
             mlflow.log_metric("r2_no_terms", nt['r2'])
             mlflow.log_metric("mape_no_terms", float(nt['mape']))
 
+        # Evidence for the promotion gate from several held-out splits (see services/multiseed_gate.py)
+        if os.getenv("MULTISEED", "1") != "0" and dataset_source_path:
+            from services import multiseed_gate
+
+            def split(s):
+                Xtr, Xte, ytr, yte, df_l = load_data(dataset_source_path, seed=s, save=False)
+                return Xtr, Xte, ytr, yte, groups_for(df_l, Xtr)
+
+            ms = multiseed_gate.evaluate_seeds(split, lambda: make_model(params))
+            multiseed_gate.log_metrics(ms, mlflow.log_metric)
+            print(f"Multi-seed ({ms['multiseed_n']} splits): RMSE {ms['rmse_multiseed']:.2f} ± {ms['rmse_multiseed_std']:.2f}")
+
         # Log model
         if PER_SQM:  # the wrapper (rent out), not the bare booster (rent per m² out)
             mlflow.sklearn.log_model(model, "lgbm_model")
@@ -244,7 +264,7 @@ def train_and_log_model(X_train, X_test, y_train, y_test, params,
         mlflow.log_param("per_sqm_target", PER_SQM)
         if PER_SQM:
             mlflow.log_param("per_sqm_weight_power", PER_SQM_WEIGHT_POWER)
-        geo_file = os.path.join(os.path.dirname(__file__), f"{VARIANT}-geo.json")
+        geo_file = os.path.join(OUT_DIR, f"{VARIANT}-geo.json")
         if USE_GEO and os.path.exists(geo_file):
             mlflow.log_artifact(geo_file, "preprocessing")
 
@@ -296,9 +316,15 @@ def train_and_log_model(X_train, X_test, y_train, y_test, params,
             print(f"SHAP logging skipped: {e}")
 
         # Save model locally
-        joblib.dump(model, os.path.join(os.path.dirname(__file__), f"{VARIANT}-model.joblib"))
+        joblib.dump(model, os.path.join(OUT_DIR, f"{VARIANT}-model.joblib"))
         from services.artifact_bundle import stamp
-        stamp(os.path.dirname(__file__), VARIANT)  # model / features / geo state now belong together
+        run_id = run.info.run_id
+        stamp(OUT_DIR, VARIANT, run_id)  # model / features / geo state now belong together
+        # The registry serves from this: services/model_sync.py downloads the Production run's bundle
+        for suffix in ("model.joblib", "features.json", "geo.json"):
+            f = os.path.join(OUT_DIR, f"{VARIANT}-{suffix}")
+            if os.path.exists(f):
+                mlflow.log_artifact(f, "bundle")
 
         run_id = run.info.run_id
 
@@ -360,6 +386,15 @@ def train_and_log_model(X_train, X_test, y_train, y_test, params,
                 print(f"   Current metrics: RMSE={rmse:.2f}, R²={r2:.4f}, MAPE={mape:.2f}%\n")
         except Exception as e:
             print(f"Warning: Auto-promotion check failed: {e}")
+
+        # Serve the registry's Production version: installs this run's bundle if it was just promoted
+        # (training only ever writes to OUT_DIR, never over the files the API is serving)
+        try:
+            from services.model_sync import sync_production_models
+            report = sync_production_models(os.path.dirname(__file__))[VARIANT]
+            print(f"Serving: {report['action']}" + (f" ({report['reason']})" if report.get("reason") else ""))
+        except Exception as e:
+            print(f"Warning: could not sync served models: {e}")
 
         # save in bentoml format also
         try:

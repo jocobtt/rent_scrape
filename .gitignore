@@ -62,3 +62,4 @@ data/*
 .claude/
 .DS_Store
 todo.md
+api/models/staging/

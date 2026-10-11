@@ -85,6 +85,7 @@
   },
   "bundle": {
     "model_sha256": "7f3b6c11a4a14fa2ee1f69848b140c7daa10016881d3043bd6fe646deb9d4b5c",
-    "geo_sha256": "e31101dace22194ef90e958219cdeace8398aea7c7659823dfceeb62d4ba5c09"
+    "geo_sha256": "e31101dace22194ef90e958219cdeace8398aea7c7659823dfceeb62d4ba5c09",
+    "run_id": "7776720be7b04e76b6c57be4bfc76eb4"
   }
 }

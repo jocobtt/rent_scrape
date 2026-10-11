@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Header, Request, status
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 import logging
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, AnyHttpUrl, model_validator
@@ -11,6 +12,9 @@ import pandas as pd
 import httpx
 import os
 import secrets
+import asyncio
+import threading
+import time
 import numpy as np
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -354,9 +358,69 @@ def _build_prediction_service() -> PredictionService:
     )
 
 
+# ---- Serve the registry's Production versions (services/model_sync.py) -------------------------
+# models/ is a cache of what the registry calls Production. The API re-checks it at most every
+# MODEL_SYNC_INTERVAL_S seconds (promotions made by the scheduled tasks or a training script run in
+# other processes) and straight away after a promote / rollback through this API. MODEL_SYNC=0 serves
+# whatever is on disk.
+MODEL_SYNC_INTERVAL_S = float(os.getenv("MODEL_SYNC_INTERVAL_S", "300"))
+_model_sync_lock = threading.Lock()
+_model_sync_last = [0.0]
+_SERVED_MODELS = (("challenger_model", "challenger"), ("passed_model", "passed"),
+                  ("challenger_noterms_model", "challenger-noterms"), ("passed_noterms_model", "passed-noterms"))
+
+
+def _reload_models() -> None:
+    """Reload every served model from models/ and rebuild the prediction services, swapping them in only
+    once they all built (a bundle that fails verification leaves the running models untouched)."""
+    global prediction_service, ensemble_prediction_service
+    loaded = {}
+    for attr, name in _SERVED_MODELS:
+        try:
+            loaded[attr] = model_loader.load_model(name)
+        except Exception as e:
+            logger.info(f"No {name} model after sync: {e}")
+            loaded[attr] = None
+    if loaded["challenger_model"] is None or loaded["passed_model"] is None:
+        raise RuntimeError("shared challenger / passed model missing after sync")
+    new_service = PredictionService(
+        loaded["passed_model"], loaded["challenger_model"],
+        passed_noterms_model=loaded["passed_noterms_model"],
+        challenger_noterms_model=loaded["challenger_noterms_model"],
+    )
+    new_ensemble = EnsemblePredictionService(loaded["passed_model"], loaded["challenger_model"])
+    for attr, model in loaded.items():
+        setattr(app.state, attr, model)
+    prediction_service, ensemble_prediction_service = new_service, new_ensemble
+    logger.info("Reloaded served models from the registry's Production versions")
+
+
+def refresh_models_from_registry(force: bool = False) -> Dict[str, Any]:
+    """Sync models/ with the registry and reload what changed. Never raises (serving continues)."""
+    if os.getenv("MODEL_SYNC", "1") == "0":
+        return {"status": "disabled"}
+    if not _model_sync_lock.acquire(blocking=False):
+        return {"status": "busy"}
+    try:
+        if not force and time.monotonic() - _model_sync_last[0] < MODEL_SYNC_INTERVAL_S:
+            return {"status": "skipped"}
+        _model_sync_last[0] = time.monotonic()
+        from services.model_sync import sync_production_models
+        report = sync_production_models(model_loader.models_dir)
+        updated = [v for v, r in report.items() if r.get("action") == "updated"]
+        if updated:
+            _reload_models()
+        return {"status": "ok", "updated": updated, "variants": report}
+    except Exception as e:
+        logger.error(f"Model sync failed; still serving the previous models: {e}")
+        return {"status": "error", "error": str(e)}
+    finally:
+        _model_sync_lock.release()
+
+
 @app.middleware("http")
 async def load_model_middleware(request: Request, call_next):
-    global prediction_service, torch_prediction_service
+    global prediction_service, ensemble_prediction_service, torch_prediction_service
     
     if not hasattr(app.state, 'challenger_model'):
         try:
@@ -414,6 +478,10 @@ async def load_model_middleware(request: Request, call_next):
             )
             logger.info(f"Initialized PyTorchPredictionService with {len(app.state.torch_models)} models")
     
+    # Pick up promotions made elsewhere, off the request path
+    if time.monotonic() - _model_sync_last[0] >= MODEL_SYNC_INTERVAL_S and os.getenv("MODEL_SYNC", "1") != "0":
+        asyncio.get_running_loop().run_in_executor(None, refresh_models_from_registry)
+
     response = await call_next(request)
     return response
 
@@ -1817,7 +1885,9 @@ async def promote_model_version(request: Request, model_name: str, version: str,
         result = auto_promotion_service.promote_specific_version(model_name, version, force)
         if not result["promoted"]:
             return {"status": "not_promoted", "message": result.get("reason"), "force_required": result.get("force_required", False)}
-        return {"status": "success", "message": f"Promoted {model_name} v{version} to Production", "result": result}
+        serving = await run_in_threadpool(refresh_models_from_registry, True)
+        return {"status": "success", "message": f"Promoted {model_name} v{version} to Production", "result": result,
+                "serving": serving}
     except Exception as e:
         logger.error(f"Error promoting model: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
@@ -1828,10 +1898,17 @@ async def check_models_for_promotion(request: Request, dry_run: bool = True):
     """Check all models and promote qualified ones"""
     try:
         results = auto_promotion_service.check_and_promote_new_models(dry_run=dry_run)
-        return {"status": "success", "results": results}
+        serving = None if dry_run else await run_in_threadpool(refresh_models_from_registry, True)
+        return {"status": "success", "results": results, "serving": serving}
     except Exception as e:
         logger.error(f"Error checking models: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@app.get("/models/serving", tags=["Model Management"])
+async def models_serving_status():
+    """Which run each variant is serving from disk vs. the registry's Production run."""
+    from services.model_sync import serving_status
+    return {"status": "success", "variants": await run_in_threadpool(serving_status, model_loader.models_dir)}
 
 @app.get("/models/{model_name}/promotion-status")
 async def get_promotion_status(model_name: str):
@@ -1851,7 +1928,9 @@ async def rollback_model(request: Request, model_name: str):
         result = auto_promotion_service.rollback_to_previous(model_name)
         if not result["rolled_back"]:
             return {"status": "not_rolled_back", "message": result.get("reason")}
-        return {"status": "success", "message": f"Rolled back {model_name} to v{result['version']}", "result": result}
+        serving = await run_in_threadpool(refresh_models_from_registry, True)
+        return {"status": "success", "message": f"Rolled back {model_name} to v{result['version']}", "result": result,
+                "serving": serving}
     except Exception as e:
         logger.error(f"Error during rollback: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

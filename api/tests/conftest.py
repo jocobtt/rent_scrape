@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 import os
 
 os.environ.setdefault("ADMIN_API_KEY", "test-admin-key")
+os.environ.setdefault("MODEL_SYNC", "0")  # no registry in tests; individual tests opt in
 
 import model_api
 
