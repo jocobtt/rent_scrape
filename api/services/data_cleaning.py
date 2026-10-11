@@ -71,6 +71,12 @@ def resolve_dataset_path(path: Optional[str] = None) -> Path:
     return latest
 
 
+def dataset_id(path) -> str:
+    """Id of a dataset file: the version folder name for api/dataset_versions/<id>/data.csv, else the file name."""
+    p = Path(path)
+    return p.parent.name if p.parent.parent == DATASET_VERSIONS_DIR else p.name
+
+
 def clean_listings(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, int]]:
     """Dedupe, fix units and drop implausible rows. Returns (cleaned, counts)."""
     report = {"rows_in": len(df)}

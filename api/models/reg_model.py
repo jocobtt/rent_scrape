@@ -153,7 +153,8 @@ def log_mlflow(model_name, model, X_train, y_train, X_test, y_test, mlflow_name,
 
         # The registry serves from this bundle (services/model_sync.py)
         from services.artifact_bundle import stamp
-        stamp(OUT_DIR, VARIANT, run.info.run_id)
+        from services.data_cleaning import dataset_id, resolve_dataset_path
+        stamp(OUT_DIR, VARIANT, run.info.run_id, dataset=dataset_id(resolve_dataset_path()))
         for suffix in ("model.joblib", "features.json", "geo.json"):
             f = os.path.join(OUT_DIR, f"{VARIANT}-{suffix}")
             if os.path.exists(f):

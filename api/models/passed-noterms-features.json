@@ -90,6 +90,7 @@
   "bundle": {
     "model_sha256": "e91ce586c0840836ffc6fc20e17f1b94979763870be1adf5831e35517acc3f22",
     "geo_sha256": "802100d1270d2a445fe4df93c1791a511823ade3512fc5d202cbb5e0a0fc6ef2",
-    "run_id": "4d4e8102aa9641509076757e7c6af39e"
+    "run_id": "4d4e8102aa9641509076757e7c6af39e",
+    "dataset": "076812c27246"
   }
 }

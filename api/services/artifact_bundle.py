@@ -39,14 +39,16 @@ def _paths(models_dir: Union[str, Path], variant: str):
     return d / f"{variant}-model.joblib", d / f"{variant}-features.json", d / f"{variant}-geo.json"
 
 
-def stamp(models_dir: Union[str, Path], variant: str, run_id: Optional[str] = None) -> dict:
+def stamp(models_dir: Union[str, Path], variant: str, run_id: Optional[str] = None,
+          dataset: Optional[str] = None) -> dict:
     """Record the current model and geo-state hashes in `<variant>-features.json`. `run_id` is the MLflow
-    run that produced the files (services/model_sync.py compares it with the registry's Production run)."""
+    run that produced the files (services/model_sync.py compares it with the registry's Production run);
+    `dataset` is the id of the training scrape (scripts/score_fresh_listings.py needs it to find newer listings)."""
     model, features, geo = _paths(models_dir, variant)
     with open(features, encoding="utf-8") as f:
         state = json.load(f)
     state["bundle"] = {"model_sha256": _sha256(model), "geo_sha256": _sha256(geo) if geo.exists() else None,
-                       "run_id": run_id}
+                       "run_id": run_id, "dataset": dataset}
     with open(features, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
     return state["bundle"]

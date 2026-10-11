@@ -76,6 +76,7 @@
   "bundle": {
     "model_sha256": "eb74d8eacae05c5fb98b79a241c0c2ce4f3995a910a88c729b40cd5dd6efc030",
     "geo_sha256": null,
-    "run_id": "020a1f9ec0444c00be785c968889111e"
+    "run_id": "020a1f9ec0444c00be785c968889111e",
+    "dataset": "076812c27246"
   }
 }

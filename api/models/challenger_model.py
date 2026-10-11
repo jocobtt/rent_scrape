@@ -318,8 +318,9 @@ def train_and_log_model(X_train, X_test, y_train, y_test, params,
         # Save model locally
         joblib.dump(model, os.path.join(OUT_DIR, f"{VARIANT}-model.joblib"))
         from services.artifact_bundle import stamp
+        from services.data_cleaning import dataset_id
         run_id = run.info.run_id
-        stamp(OUT_DIR, VARIANT, run_id)  # model / features / geo state now belong together
+        stamp(OUT_DIR, VARIANT, run_id, dataset=dataset_id(dataset_source_path) if dataset_source_path else None)  # model / features / geo state now belong together
         # The registry serves from this: services/model_sync.py downloads the Production run's bundle
         for suffix in ("model.joblib", "features.json", "geo.json"):
             f = os.path.join(OUT_DIR, f"{VARIANT}-{suffix}")
