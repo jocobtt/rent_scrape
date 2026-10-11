@@ -6,10 +6,16 @@ on:
   pull_request:
     branches: [master, main]
 
+# A newer push to the same branch / PR makes the running test job obsolete
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: api
@@ -19,12 +25,20 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: api/uv.lock
 
+      # --frozen: fail if uv.lock is out of date with pyproject.toml instead of silently re-resolving
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
 
+      # No scraped data, MLflow server or network in CI: the tests use the committed models in
+      # api/models/ (their SHA-256 stamps are verified on load, so a model committed without its
+      # features file fails here) and the synthetic fixtures.
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short -m "not integration"
         env:
           MLFLOW_TRACKING_URI: http://localhost:5001
           ENVIRONMENT: test
+          GEO_LIVE_GEOCODE: "0"
