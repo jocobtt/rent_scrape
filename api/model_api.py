@@ -513,10 +513,11 @@ async def predict_main(request: Request, data: InputData):
 
         # Log prediction for drift monitoring
         try:
-            data_capture_service.log_prediction(
+            result["prediction_id"] = data_capture_service.log_prediction(
                 model_type="passed",
                 input_features=data.dict(),
-                prediction=result["prediction"]
+                prediction=result["prediction"],
+                variant=result.get("variant"),
             )
         except Exception as log_error:
             logger.warning(f"Failed to log prediction: {log_error}")
@@ -555,10 +556,11 @@ async def challenger_predict(request: Request, data: InputData):
 
         # Log prediction for drift monitoring
         try:
-            data_capture_service.log_prediction(
+            result["prediction_id"] = data_capture_service.log_prediction(
                 model_type="challenger",
                 input_features=data.dict(),
-                prediction=result["prediction"]
+                prediction=result["prediction"],
+                variant=result.get("variant"),
             )
         except Exception as log_error:
             logger.warning(f"Failed to log prediction: {log_error}")
@@ -1435,6 +1437,27 @@ async def generate_monitoring_reports(
             detail=f"Report generation failed: {str(e)}"
         )
 
+class GroundTruthItem(BaseModel):
+    prediction_id: str = Field(..., max_length=64, description="`prediction_id` from the /predict response")
+    actual_value: float = Field(..., gt=0, description="Actual monthly rent in 万円")
+
+
+class GroundTruthRequest(BaseModel):
+    labels: List[GroundTruthItem] = Field(..., min_length=1, max_length=1000)
+
+
+@app.post("/monitoring/ground-truth", tags=["Monitoring"], dependencies=[Depends(require_admin)])
+@limiter.limit(MONITORING_RATE_LIMIT)
+async def submit_ground_truth(request: Request, body: GroundTruthRequest):
+    """Attach actual rents to logged predictions; performance monitoring and A/B analysis need them."""
+    def apply():
+        return [data_capture_service.update_actual_value(i.prediction_id, i.actual_value) for i in body.labels]
+
+    outcomes = await run_in_threadpool(apply)
+    return {"status": "success", "updated": sum(outcomes),
+            "not_found": [i.prediction_id for i, ok in zip(body.labels, outcomes) if not ok]}
+
+
 @app.get("/monitoring/compare_models")
 async def compare_models_drift(days_back: int = 7):
     """
@@ -1524,6 +1547,7 @@ async def create_ab_test(request: Request, body: ABTestCreateRequest):
             min_effect_size=body.min_effect_size,
         )
 
+        ab_testing_service.validate_config(config)  # ValueError -> 400
         success = ab_testing_service.create_experiment(config)
 
         if success:

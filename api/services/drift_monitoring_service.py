@@ -10,6 +10,7 @@ It tracks:
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
@@ -35,6 +36,11 @@ logger = logging.getLogger(__name__)
 DEFAULT_DRIFT_THRESHOLD = 0.1
 # Deposit / key money are optional request fields, so they are legitimately missing in prediction logs
 OPTIONAL_COLUMNS = ("rei_price", "shikikin")
+# Evidently's per-column distance threshold is fixed (0.1), so on small windows ordinary sampling noise
+# crosses it: on data drawn from the reference distribution, >=30% of features were flagged in 88% of
+# 60-row windows, 48% of 100-row, 4% of 200-row and 0% of 400-row ones. Below this many rows "drift" is
+# not a decision anyone should act on (hourly auto-retrain would retrain on noise).
+MIN_DRIFT_SAMPLES = int(os.getenv("DRIFT_MIN_SAMPLES", "200"))
 
 
 class DriftMonitoringService:
@@ -158,6 +164,10 @@ class DriftMonitoringService:
             logger.info(f"Saved JSON report to {json_path}")
 
         summary = self._extract_drift_summary(snapshot, drift_share_threshold)
+        summary["current_rows"] = len(current_data)
+        summary["reliable"] = len(current_data) >= MIN_DRIFT_SAMPLES
+        if not summary["reliable"]:
+            summary["dataset_drift"] = False  # per-column numbers are still reported, as information only
         logger.info(f"Data drift summary: {summary}")
 
         return snapshot, summary

@@ -181,6 +181,18 @@ class ABTestingService:
 
         logger.info("ABTestingService initialized")
 
+    @staticmethod
+    def validate_config(config: ABTestConfig) -> None:
+        """Raise ValueError for a config that must not be stored."""
+        if not _EXPERIMENT_NAME.match(config.experiment_name):
+            raise ValueError("experiment_name must be 1-64 letters, digits, '_' or '-'")
+
+        if config.traffic_split < 0 or config.traffic_split > 1:
+            raise ValueError("traffic_split must be between 0 and 1")
+
+        if config.min_samples < 10:
+            raise ValueError("min_samples must be at least 10")
+
     def create_experiment(self, config: ABTestConfig) -> bool:
         """
         Create a new A/B test experiment
@@ -192,15 +204,7 @@ class ABTestingService:
             True if successful
         """
         try:
-            # Validate config
-            if not _EXPERIMENT_NAME.match(config.experiment_name):
-                raise ValueError("experiment_name must be 1-64 letters, digits, '_' or '-'")
-
-            if config.traffic_split < 0 or config.traffic_split > 1:
-                raise ValueError("traffic_split must be between 0 and 1")
-
-            if config.min_samples < 10:
-                raise ValueError("min_samples must be at least 10")
+            self.validate_config(config)
 
             # Save config
             config_path = self.experiments_dir / f"{config.experiment_name}.json"

@@ -328,7 +328,7 @@ MLFLOW_TRACKING_URI=http://localhost:5001
 
 **SLA demotion (`services/sla_service.py`):** floors are derived from `PROMOTION_THRESHOLDS` (RMSE x1.25, R² -0.08, MAPE x1.5), in 万円 like the logged metrics. A Production model breaching one is demoted to Staging.
 
-**Drift (`services/drift_monitoring_service.py`):** Evidently's `ValueDrift` returns a distance per column and flags drift when it exceeds the method's threshold (0.1 by default). Columns that are entirely empty (e.g. every logged request omitted deposit / key money) are skipped; optional deposit / key money gaps are not a data-quality failure. Auto-retrain compares each model's recent MAE with the MAE of its Production run in MLflow, retrains the no-terms variants with their family, and honours `min_days_between_retrains`.
+**Drift (`services/drift_monitoring_service.py`):** Drift is only decided on windows of at least `DRIFT_MIN_SAMPLES` (default 200) rows: with fewer, Evidently's fixed 0.1 threshold flags noise (88% false alarms at 60 rows, 4% at 200, 0% at 400 on data from the reference distribution), and `run_drift_detection` returns `insufficient_data`. Evidently's `ValueDrift` returns a distance per column and flags drift when it exceeds the method's threshold (0.1 by default). Columns that are entirely empty (e.g. every logged request omitted deposit / key money) are skipped; optional deposit / key money gaps are not a data-quality failure. Auto-retrain compares each model's recent MAE with the MAE of its Production run in MLflow, retrains the no-terms variants with their family, and honours `min_days_between_retrains`.
 
 **Drift Detection Triggers:**
 - Data drift: Distribution shifts in input features (statistical tests)
@@ -345,7 +345,7 @@ MLFLOW_TRACKING_URI=http://localhost:5001
 - All predictions logged to `prediction_logs/predictions_YYYY-MM-DD.csv`
 - Buffered writes (default: 100 predictions before flush)
 - Used for drift monitoring and model performance tracking
-- Ground truth can be added later via `/monitoring/update-ground-truth`
+- Every logged prediction has a `prediction_id` (also returned by `/predict` and `/challenger_predict`) and the serving `variant`. Ground truth is added with `POST /monitoring/ground-truth` (admin; `{"labels": [{"prediction_id", "actual_value"}]}`), which rewrites only the log file holding the prediction
 
 ## Documentation References
 

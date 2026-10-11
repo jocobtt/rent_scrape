@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from .drift_monitoring_service import DriftMonitoringService, load_reference_data
+from .drift_monitoring_service import MIN_DRIFT_SAMPLES, DriftMonitoringService, load_reference_data
 from .data_capture_service import DataCaptureService
 
 logger = logging.getLogger(__name__)
@@ -181,6 +181,16 @@ class MonitoringReportsManager:
             return {
                 "status": "error",
                 "message": "No prediction data available",
+            }
+
+        if len(current_data) < MIN_DRIFT_SAMPLES:
+            return {
+                "status": "insufficient_data",
+                "drift_detected": False,
+                "message": f"{len(current_data)} predictions in the window; need at least {MIN_DRIFT_SAMPLES} "
+                           "for a drift decision (smaller windows produce false alarms)",
+                "current_rows": len(current_data),
+                "min_samples": MIN_DRIFT_SAMPLES,
             }
 
         # Prepare data

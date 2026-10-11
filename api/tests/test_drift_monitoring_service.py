@@ -68,3 +68,11 @@ def test_single_column_drift(svc):
     assert svc.check_column_drift(cur, "sqr_m")["drift_detected"]
     assert not svc.check_column_drift(cur, "floor")["drift_detected"]
     assert svc.check_column_drift(cur, "sqr_m")["drift_score"] > svc.check_column_drift(cur, "sqr_m")["threshold"]
+
+
+def test_small_windows_are_reported_but_never_called_drift(svc):
+    _, summary = svc.generate_data_drift_report(frame(60, 9, shift=1.0), save_html=False, save_json=False)
+    assert summary["current_rows"] == 60 and not summary["reliable"] and not summary["dataset_drift"]
+    assert summary["drifted_columns"]  # the per-column numbers are still there for a human
+    _, big = svc.generate_data_drift_report(frame(400, 9, shift=1.0), save_html=False, save_json=False, drift_share_threshold=0.2)
+    assert big["reliable"] and big["dataset_drift"]

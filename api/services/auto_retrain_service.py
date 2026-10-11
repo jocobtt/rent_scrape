@@ -196,7 +196,7 @@ class AutoRetrainService:
             # Filter to recent predictions
             cutoff_date = datetime.now() - timedelta(days=days_back)
             predictions_with_actuals["timestamp"] = pd.to_datetime(
-                predictions_with_actuals["timestamp"]
+                predictions_with_actuals["timestamp"], format="ISO8601"
             )
             recent = predictions_with_actuals[
                 predictions_with_actuals["timestamp"] >= cutoff_date
