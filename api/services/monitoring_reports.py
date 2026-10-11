@@ -40,7 +40,13 @@ class MonitoringReportsManager:
 
         # Load reference data
         logger.info("Loading reference data for drift monitoring...")
-        self.reference_data = load_reference_data(reference_data_path)
+        try:
+            self.reference_data = load_reference_data(reference_data_path)
+        except FileNotFoundError as exc:
+            # Scraped data is not committed: a fresh checkout / CI / new deploy must still boot.
+            # Reports need a baseline, so they fail when generated, not at import time.
+            logger.warning("No reference data for drift monitoring (%s); drift reports are unavailable", exc)
+            self.reference_data = pd.DataFrame()
 
         # Initialize services
         self.drift_service = DriftMonitoringService(
