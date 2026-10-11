@@ -194,6 +194,21 @@ class ExplainabilityService:
 
         model_class = type(model).__name__.lower()
 
+        # Per-m² wrapper: explain the booster, then scale to rent (rent = per-m² prediction x size,
+        # so attributions and the base value scale by the row's size)
+        if hasattr(model, "predict_per_sqm"):
+            inner = shap.TreeExplainer(model.estimator_)
+            sizes = model._size(data)
+
+            class _RentExplainer:
+                def __call__(self, X):
+                    sv = inner(X)
+                    k = model._size(X)
+                    return shap.Explanation(values=sv.values * k[:, None], base_values=np.asarray(sv.base_values) * k,
+                                            data=sv.data, feature_names=sv.feature_names)
+
+            return _RentExplainer(), np.array(inner.shap_values(data)) * sizes[:, None]
+
         # LightGBM – exact TreeExplainer
         if "lgbm" in model_class or "lightgbm" in model_class or "booster" in model_class:
             explainer = shap.TreeExplainer(model)

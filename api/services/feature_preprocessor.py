@@ -23,13 +23,16 @@ import logging
 import pandas as pd
 from pathlib import Path
 
+from services.geo_features import GEO_COLS, GeoRentFeatures
+
 logger = logging.getLogger(__name__)
 
 _CAT_COLS = ["ku_name", "apartment_type", "house_type"]
 
 # Identifier / provenance columns: kept in the raw data for splitting and
-# lineage, but never used as model features.
-_META_COLS = ["address", "building_id", "scraped_at"]
+# lineage, but never used as model features. (Station / line strings and n_stations are
+# for target encodings and are not API inputs yet.)
+_META_COLS = ["address", "building_id", "scraped_at", "nearest_station", "nearest_line", "n_stations"]
 
 # Deposit / key money: often unknown when a listing is priced and near-leaky when known.
 # Models are trained with these randomly masked (see `mask_optional_terms`) so they can
@@ -89,6 +92,15 @@ class FeaturePreprocessor:
         )
         return encoded, self.feature_columns_
 
+    def add_geo(self, geo: GeoRentFeatures, train_features: pd.DataFrame) -> None:
+        """Append the spatial-lag columns (models trained with `fit_geo_features`) and keep the
+        fitted lookup so `transform_single` can compute them from a request `address`.
+        `train_features` supplies training medians for models that cannot take NaN."""
+        self.feature_columns_ = [c for c in self.feature_columns_ if c not in GEO_COLS] + list(train_features.columns)
+        self.geo_ = geo
+        self.fill_values_ = {**getattr(self, "fill_values_", {}),
+                             **{c: float(train_features[c].median()) for c in train_features.columns}}
+
     def transform_single(self, input_dict: dict, impute_missing: bool = False) -> pd.DataFrame:
         """
         Build a single-row DataFrame with exactly the columns the model expects.
@@ -108,7 +120,7 @@ class FeaturePreprocessor:
         if not hasattr(self, "feature_columns_"):
             raise RuntimeError("FeaturePreprocessor has not been fitted or loaded.")
 
-        row: dict = {col: 0 for col in self.feature_columns_}
+        row: dict = {col: (float("nan") if col in GEO_COLS else 0) for col in self.feature_columns_}
 
         # Resolve aliases first (eki_walk → nearest_eki_walk)
         resolved = {}
@@ -119,6 +131,19 @@ class FeaturePreprocessor:
         for key, val in resolved.items():
             if key in row and val is not None:
                 row[key] = val
+
+        # Spatial-lag features come from the request address (NaN without one)
+        if any(c in row for c in GEO_COLS):
+            geo = getattr(self, "geo_", None)
+            feats = (geo.transform_address(resolved.get("address"), resolved.get("nearest_station"),
+                                           resolved.get("nearest_line")) if geo is not None else {})
+            for col, val in feats.items():
+                if col in row:
+                    row[col] = val
+            if impute_missing:  # models that cannot take NaN get the training mean of the lag
+                for col in GEO_COLS:
+                    if col in row and pd.isna(row[col]):
+                        row[col] = (getattr(self, "fill_values_", {}).get(col, 0.0))
 
         # Missing deposit / key money: NaN for NaN-aware models, training median otherwise
         for col in OPTIONAL_TERMS:
@@ -153,7 +178,16 @@ class FeaturePreprocessor:
                  "fill_values": getattr(self, "fill_values_", {})}
         with open(path, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
+        geo = getattr(self, "geo_", None)
+        if geo is not None:
+            geo.save(self.geo_path(path))
         logger.info("FeaturePreprocessor saved → %s  (%d features)", path, len(self.feature_columns_))
+
+    @staticmethod
+    def geo_path(features_path: str | Path) -> Path:
+        """models/foo-features.json -> models/foo-geo.json"""
+        features_path = Path(features_path)
+        return features_path.with_name(features_path.name.replace("-features.json", "-geo.json"))
 
     @classmethod
     def load(cls, path: str | Path) -> "FeaturePreprocessor":
@@ -163,6 +197,12 @@ class FeaturePreprocessor:
         obj = cls()
         obj.feature_columns_ = state["feature_columns"]
         obj.fill_values_ = state.get("fill_values", {})
+        if any(c in GEO_COLS for c in obj.feature_columns_):
+            geo_path = cls.geo_path(path)
+            if geo_path.exists():
+                obj.geo_ = GeoRentFeatures.load(geo_path)
+            else:
+                logger.warning("%s expects geo features but %s is missing; they will be NaN", path, geo_path)
         logger.info("FeaturePreprocessor loaded ← %s  (%d features)", path, len(obj.feature_columns_))
         return obj
 

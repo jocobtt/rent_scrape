@@ -32,7 +32,6 @@ def raw_listings():
         "rei_price": rng.uniform(0, 20, n),
         "shikikin": rng.uniform(0, 20, n),
         "maintenence_price": rng.uniform(0, 2, n),
-        "contract_type": 0,
         "year_built": rng.integers(0, 40, n),
         "floor": rng.integers(1, 15, n),
         "nearest_eki_walk": rng.integers(1, 20, n),

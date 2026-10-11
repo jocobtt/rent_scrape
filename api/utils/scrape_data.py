@@ -179,14 +179,15 @@ class ScrapeData:
         data['floor'] = data['floor'].apply(floor_fix)
         data['nearest_eki_walk'] = data['nearest_eki'].apply(convert_nearest_eki)
         data['nearest_eki_name'] = data['nearest_eki'].apply(eki_name)
-
-        # New fields
-        data['contract_type'] = data['contract_type'].apply(
-            lambda x: 1 if '定期' in str(x) else 0
-        )
+        # Station / line of the nearest station and how many stations the listing names.
+        # Identifier-like strings: they feed target encodings, not the raw model inputs.
+        parsed = data['nearest_eki'].apply(parse_station)
+        data['nearest_station'] = parsed.apply(lambda p: p['station'])
+        data['nearest_line'] = parsed.apply(lambda p: p['line'])
+        data['n_stations'] = data['all_stations'].apply(count_stations) if 'all_stations' in data.columns else 1
 
         data = data.drop(
-            columns=['nearest_eki', 'age', 'Lon', 'Lat',
+            columns=['nearest_eki', 'age', 'Lon', 'Lat', 'all_stations',
                      'name_place', 'direction', 'nearest_eki_name', 'ward_name'],
             errors='ignore',
         )
@@ -356,6 +357,7 @@ class ScrapeData:
                 'rei_price': self._safe_text(tr.find('span', class_='cassetteitem_price--gratuity')),
                 'shikikin': self._safe_text(tr.find('span', class_='cassetteitem_price--deposit')),
                 'nearest_eki': nearest_eki,
+                'all_stations': "|".join(station_texts),
                 'house_type': house_type,
                 'floor': tds[2].get_text(strip=True) if len(tds) > 2 else "-",
                 'ku_name': ku_name,
@@ -363,7 +365,6 @@ class ScrapeData:
                 'apartment_type': self._safe_text(tr.find('span', class_='cassetteitem_madori')),
                 'maintenence_price': self._safe_text(tr.find('span', class_='cassetteitem_price--administration')),
                 'direction': "-",
-                'contract_type': "定期借家" if "定期" in tr.get_text() else "普通借家",
             })
         return rows
 
@@ -433,6 +434,28 @@ def convert_nearest_eki(x):
 def eki_name(x):
     x = str(x)
     return x.split('歩')[0] if '歩' in x else x
+
+
+def parse_station(x) -> dict:
+    """Split a Suumo station string such as '東急東横線/代官山駅 歩6分'.
+
+    Returns {'line', 'station', 'walk_min'}; fields that cannot be read are '' / 0.
+    The station name loses its trailing 駅 so the same station matches across lines.
+    """
+    x = str(x).strip()
+    head, _, tail = x.partition('歩')
+    line, _, station = head.rpartition('/')
+    station = station.strip()
+    if station.endswith('駅'):
+        station = station[:-1]
+    if not station or station == '-':
+        station = ''
+    return {'line': line.strip(), 'station': station, 'walk_min': convert_nearest_eki(f'歩{tail}') if tail else 0}
+
+
+def count_stations(x) -> int:
+    """Number of stations in a '|'-joined list of Suumo station strings (at least 1)."""
+    return max(1, sum(1 for part in str(x).split('|') if '歩' in part))
 
 
 def convert_sqr_m(x):

@@ -36,10 +36,13 @@ Each run writes a versioned snapshot (CSV plus manifest with a content hash) to
 | `maintenence_price` | monthly maintenance fee | yen in raw data |
 | `year_built` | building age | years |
 | `floor` | floor number | |
-| `eki_walk` | walk to nearest station | minutes |
+| `nearest_eki_walk` | walk to nearest station | minutes |
+| `nearest_station` | nearest station name, without 駅 (new scrapes only) | text |
+| `nearest_line` | line serving that station (new scrapes only) | text |
+| `n_stations` | stations named in the listing (new scrapes only) | count |
 | `building_id` | stable hash of building name + address; **grouping key for splits** | |
 | `scraped_at` | UTC date of the scrape run; enables time-based splits across snapshots | date |
 
-`building_id` and `scraped_at` (and `address`) are identifiers: they are kept in the data
+`building_id` and `scraped_at` (and `address`, `nearest_station`, `nearest_line`, `n_stations`) are identifiers: they are kept in the data
 but excluded from the model features. Files scraped before these columns existed fall back
 to grouping by `address`.

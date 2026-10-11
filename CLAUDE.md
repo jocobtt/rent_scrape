@@ -164,18 +164,25 @@ tf/                          # Terraform (GCP deployment)
 - `rei_price`: Key money (礼金) in 万円 (10,000 yen units). **Optional**; omit if unknown
 - `shikikin`: Security deposit (敷金) in 万円. **Optional**; omit if unknown (LightGBM sees NaN, linear gets the training median; ensemble/torch/explain routes still require both and return 422)
 - `maintenence_price`: Monthly maintenance fee in 万円
+- `address`: **Optional.** Street address to the block (e.g. `東京都渋谷区猿楽町１`). The `-noterms` models (served when both `rei_price` and `shikikin` are omitted) use it to look at nearby buildings' rents: spatial-lag features from `services/geo_features.py`, geocoded with the GSI API (unseen addresses fall back to a live lookup, then the town/ward centroid; `GEO_LIVE_GEOCODE=0` disables the live call). Without an address those features are NaN
+- `nearest_station` / `nearest_line`: **Optional.** Station name (without 駅) and its line; the `-noterms` models turn them into target encodings (`te_station`, `te_line`). Independent of `address`: either, both or neither may be sent
 - `year_built`: Years since construction
 - `floor`: Floor number
 - `eki_walk`: Walking time to nearest station (minutes)
 
 **Output:** Predicted monthly rent in 万円
 
+**Geo features (no-terms models only):** `python models/challenger_model.py --no-terms` and `python models/reg_model.py --no-terms` add `geo_*` / `te_town` columns (disable with `--no-geo`) and write `models/<variant>-geo.json` next to `<variant>-features.json`; `FeaturePreprocessor.load` picks it up. It holds per-building rent aggregates from the training set, so it is derived from scraped data and is not committed. Geocoded addresses are cached in `api/geo_cache/` (`scripts/geocode_addresses.py`). On held-out buildings the address + station features cut no-terms RMSE roughly 8% (4.78 → 4.39 on the 26k-row dataset, better on 5/5 splits); bandwidth, neighbour counts and shrinkage were tuned and sit on a flat optimum (`scripts/geo_features_experiment.py --set features|tuning`). With deposit/key money present they do not help, so the shared models don't use them.
+
+**Per-m² target and residual lag (LightGBM):** `models/challenger_model.py` fits rent per m² and multiplies back by `sqr_m` (`services/per_sqm_model.py::PerSqmRegressor`; `predict` still returns rent; `PER_SQM=0` reverts). The no-terms variant also smooths the out-of-fold residual of a location-free structural model instead of raw rent per m², and drops the two density columns. On held-out buildings that took no-terms RMSE from 4.39 to about 3.97. The shared model stays on the rent target: over 15 seeds the per-m² gain with terms was only about 0.3 RMSE and not uniform, so it didn't clear the promotion gate (`scripts/per_sqm_shared_check.py`).
+
+**Model / feature / geo-state bundle:** each variant is `<variant>-model.joblib` + `-features.json` + (no-terms) `-geo.json`. Training stamps the model and geo SHA-256 into the features file (`services/artifact_bundle.py`); the API refuses to load a variant whose model or geo file doesn't match (`BUNDLE_CHECK=0` skips), and warns if the geo file is absent (the geo file isn't committed, so address / station features are NaN until it is restored or the variant retrained). `scripts/stamp_bundles.py` adopts existing files.
+
 ## MLflow Integration Details
 
 **Tracking URI:**
 - Docker: `http://mlflow:5000` (internal network)
 - Local: `http://localhost:5001` (external access)
-- Legacy code may reference `file://s3_path` (needs updating)
 
 **What Gets Logged (Both Models):**
 - Metrics: RMSE, MAE, R², MAPE, MSE

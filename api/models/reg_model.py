@@ -26,6 +26,10 @@ NO_TERMS = os.getenv("NO_TERMS") == "1" or "--no-terms" in sys.argv
 VARIANT = "passed-noterms" if NO_TERMS else "passed"
 REGISTERED_NAME = "tokyo_passed_rent_noterms" if NO_TERMS else "tokyo_passed_rent_model"
 
+# Spatial-lag rent features for the no-terms variant (see challenger_model.py / services/geo_features.py)
+USE_GEO = NO_TERMS and os.getenv("GEO_FEATURES", "1") != "0" and "--no-geo" not in sys.argv
+
+
 def load_data(dataset=None):
     import re
     import sys as _sys
@@ -41,7 +45,6 @@ def load_data(dataset=None):
 
     preprocessor = FeaturePreprocessor()
     encoded, _ = preprocessor.fit_transform(df)
-    preprocessor.save(os.path.join(os.path.dirname(__file__), f"{VARIANT}-features.json"))
 
     X = encoded.drop('rent_price', axis=1)
     y = encoded['rent_price']
@@ -49,6 +52,15 @@ def load_data(dataset=None):
     groups = group_labels(df)
     X_train, X_test, y_train, y_test, _ = grouped_train_test_split(X, y, groups, test_size=0.2, random_state=42)
     df_for_lineage = attach_groups(encoded.copy(), groups)
+    if USE_GEO and groups is not None:
+        from services.geo_features import fit_geo_features
+        geo, f_tr, f_te = fit_geo_features(df, groups, X_train.index, X_test.index)
+        preprocessor.add_geo(geo, f_tr)
+        # linear models cannot take NaN: rows without coordinates get the training median
+        fill = preprocessor.fill_values_
+        X_train = pd.concat([X_train, f_tr.fillna(fill)], axis=1)
+        X_test = pd.concat([X_test, f_te.fillna(fill)], axis=1)
+    preprocessor.save(os.path.join(os.path.dirname(__file__), f"{VARIANT}-features.json"))
     return X_train, X_test, y_train, y_test, df_for_lineage
 
 def train_model(X_train, y_train, alpha=1.0):
@@ -129,6 +141,10 @@ def log_mlflow(model_name, model, X_train, y_train, X_test, y_test, mlflow_name,
         if hasattr(_final_estimator(model), 'alpha'):
             params["alpha"] = _final_estimator(model).alpha
         mlflow.log_params(params)
+        mlflow.log_param("geo_features", USE_GEO)
+        geo_file = os.path.join(os.path.dirname(__file__), f"{VARIANT}-geo.json")
+        if USE_GEO and os.path.exists(geo_file):
+            mlflow.log_artifact(geo_file, "preprocessing")
 
         # CROSS-VALIDATION EVALUATION
         import sys
@@ -350,3 +366,5 @@ if __name__ == "__main__":
     log_mlflow(best_model_name, best_model, X_train, y_train, X_test, y_test, mlflow_name="reg_passed_model", best_mse=best_mse, df_for_lineage=df_for_lineage)
     path = os.path.join(os.path.dirname(__file__), f"{VARIANT}-model.joblib")
     joblib.dump(best_model, path)
+    from services.artifact_bundle import stamp
+    stamp(os.path.dirname(__file__), VARIANT)  # model / features / geo state now belong together

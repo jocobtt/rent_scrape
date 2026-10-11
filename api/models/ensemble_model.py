@@ -30,7 +30,7 @@ from services.data_split import (
 
 logger = logging.getLogger(__name__)
 
-mlflow.set_tracking_uri("s3_path")
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
 
 
 class EnsembleModel:

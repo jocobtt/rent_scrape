@@ -41,6 +41,8 @@ api/dataset_versions/
 api/monitoring_reports/
 api/prediction_logs/
 api/path/
+api/geo_cache/
+api/models/*-geo.json
 api/scheduled_tasks.log
 # Checkpoints written by the deep-model training scripts (real models live in MLflow)
 api/*.pth

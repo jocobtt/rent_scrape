@@ -30,6 +30,9 @@ MAX_RENT_PER_SQM = 1.5
 # Maintenance fees >= this are yen, not 万円 (1M yen/month is not a maintenance fee).
 YEN_MAINTENANCE_FLOOR = 100.0
 
+# Columns that no longer feed any model (contract_type was 0 in every scraped row)
+_DROPPED_COLUMNS = ["contract_type"]
+
 _IDENTITY_EXCLUDE = ["scraped_at"]  # duplicates are identical apart from the scrape date
 
 
@@ -71,7 +74,7 @@ def resolve_dataset_path(path: Optional[str] = None) -> Path:
 def clean_listings(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, int]]:
     """Dedupe, fix units and drop implausible rows. Returns (cleaned, counts)."""
     report = {"rows_in": len(df)}
-    df = df.copy()
+    df = df.copy().drop(columns=_DROPPED_COLUMNS, errors="ignore")
 
     # Units: legacy files store maintenance in yen; the model/API use 万円.
     if "maintenence_price" in df.columns:

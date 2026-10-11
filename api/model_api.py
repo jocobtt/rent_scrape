@@ -100,7 +100,9 @@ class InputData(BaseModel):
     ku_name:           Optional[str] = Field(default=None, description="Tokyo ward (e.g. '渋谷区', '新宿区')")
     apartment_type:    Optional[str] = Field(default=None, description="Room layout (e.g. '1K', '2LDK', 'ワンルーム')")
     house_type:        Optional[str] = Field(default=None, description="Building type (e.g. '賃貸マンション', '賃貸アパート')")
-    contract_type:     Optional[int] = Field(default=0, ge=0, le=1, description="0 = regular lease, 1 = fixed-term (定期借家)")
+    address:           Optional[str] = Field(default=None, max_length=100, description="Street address to the block (e.g. '東京都渋谷区猿楽町１'). Optional; used by the no-deposit/key-money models to look at nearby rents. An unfamiliar address is geocoded with the GSI service (disable with GEO_LIVE_GEOCODE=0)")
+    nearest_station:   Optional[str] = Field(default=None, max_length=50, description="Nearest station name without 駅 (e.g. '渋谷'). Optional; used by the no-deposit/key-money models")
+    nearest_line:      Optional[str] = Field(default=None, max_length=50, description="Line serving that station (e.g. '東急東横線'). Optional; used by the no-deposit/key-money models")
 
     @model_validator(mode="after")
     def check_finite(self) -> "InputData":
@@ -2097,7 +2099,7 @@ async def train_torch_model(request: Request,
     """
     try:
         # Import here to avoid circular imports
-        from torch_run import run_comprehensive_torch_training
+        from scripts.torch_run import run_comprehensive_torch_training
         
         logger.info(f"Starting PyTorch model training: {model_type}")
         
@@ -2329,23 +2331,6 @@ async def compare_model_explanations(request: Request, data: InputData):
 # ============================================================================
 # End Explainability Endpoints
 # ============================================================================
-
-# MLFLOW_SERVER_URL = "s3_path"
-# # get mlflow info
-# @app.get("/{path:path}")
-# async def proxy(request: Request, path: str):
-#     async with httpx.AsyncClient() as client:
-#         response = await client.get(f"{MLFLOW_SERVER_URL}{path}")
-#         return response.content, response.status_code
-
-# @app.post("/{path:path}")
-# async def proxy_post(request: Request, path: str):
-#     body = await request.body()
-#     async with httpx.AsyncClient() as client:
-#         response = await client.post(f"{MLFLOW_SERVER_URL}{path}", data=body)
-#         return response.content, response.status_code
-
-
 
 # ============================================================================
 # Lineage Endpoints

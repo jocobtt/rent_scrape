@@ -35,6 +35,7 @@ from sklearn.preprocessing import StandardScaler
 API_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, API_DIR)
 
+from services.artifact_bundle import stamp  # noqa: E402
 from services.feature_preprocessor import FeaturePreprocessor, mask_optional_terms  # noqa: E402
 
 MODELS_DIR = os.path.join(API_DIR, "models")
@@ -59,7 +60,6 @@ def make_synthetic_listings(n: int = 3000, seed: int = SEED) -> pd.DataFrame:
     floor = rng.integers(1, 20, n)
     walk = rng.integers(1, 21, n)
     house = rng.choice(HOUSE_TYPES, n, p=[0.7, 0.3])
-    contract = rng.choice([0, 1], n, p=[0.9, 0.1])
 
     rent = (
         sqr_m * 0.28 * np.array([WARD_FACTOR[k] for k in ku])
@@ -67,7 +67,6 @@ def make_synthetic_listings(n: int = 3000, seed: int = SEED) -> pd.DataFrame:
         + floor * 0.04
         - walk * 0.06
         + (house == "賃貸マンション") * 0.8
-        - contract * 0.3
         + rng.normal(0, 0.6, n)
     ).clip(2.5, None)
     maintenance = (sqr_m * 0.004 + rng.normal(0, 0.1, n)).clip(0, None)
@@ -80,7 +79,6 @@ def make_synthetic_listings(n: int = 3000, seed: int = SEED) -> pd.DataFrame:
         "year_built": year_built,
         "floor": floor,
         "nearest_eki_walk": walk,
-        "contract_type": contract,
         "apartment_type": layout,
         "ku_name": ku,
         "house_type": house,
@@ -103,6 +101,7 @@ def _fit_and_save(name: str, model, df: pd.DataFrame, mask_terms: bool = False,
     print(f"{name:<11} MAE={mean_absolute_error(y_te, pred):.2f}万円  R²={r2_score(y_te, pred):.3f}  (synthetic holdout)")
     joblib.dump(model, os.path.join(MODELS_DIR, f"{name}-model.joblib"))
     prep.save(os.path.join(MODELS_DIR, f"{name}-features.json"))
+    stamp(MODELS_DIR, name)
 
 
 def main() -> None:
