@@ -81,6 +81,22 @@ services:
       - rent-predictor-network
     restart: unless-stopped
 
+  # React dashboard (Vite dev server; proxies prediction calls to the api service)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tokyo-rent-frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      - API_ORIGIN=http://api:8000
+    depends_on:
+      - api
+    networks:
+      - rent-predictor-network
+    restart: unless-stopped
+
   # Optional: Nginx reverse proxy (uncomment to use)
   # nginx:
   #   image: nginx:alpine
