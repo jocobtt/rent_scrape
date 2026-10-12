@@ -177,3 +177,13 @@ export const getCorrelation = (data, xField, yField) => {
 export const getUniqueValues = (data, field) => {
   return [...new Set(data.map(d => d[field]))].sort();
 };
+
+/**
+ * Distinct values of a field with how many rows have each, most common first
+ * @returns {Array} [{value, count}]
+ */
+export const getValueCounts = (data, field) => {
+  const counts = d3.rollup(data, rows => rows.length, d => d[field]);
+  return Array.from(counts, ([value, count]) => ({ value, count }))
+    .sort((a, b) => b.count - a.count || String(a.value).localeCompare(String(b.value)));
+};

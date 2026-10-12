@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { getUniqueValues } from '../lib/dataUtils';
+import { getValueCounts } from '../lib/dataUtils';
+import ChipGroup from './ChipGroup';
 import { useToast } from '../context/ToastContext';
 import useDebounce from '../hooks/useDebounce';
 import './DataFilters.css';
 
 const DataFilters = ({ data, filters, onFilterChange, onReset }) => {
   const { showSuccess } = useToast();
-  const apartmentTypes = getUniqueValues(data, 'apartment_type');
-  const wards = getUniqueValues(data, 'ku_name');
+  const apartmentTypes = getValueCounts(data, 'apartment_type');
+  const wards = getValueCounts(data, 'ku_name');
+  // A layout with only a handful of listings is noise as a filter; it stays one click away
+  const rareThreshold = Math.max(3, Math.ceil(data.length * 0.0005));
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -125,35 +128,24 @@ const DataFilters = ({ data, filters, onFilterChange, onReset }) => {
       </div>
 
       <div className="filter-section">
-        <h4>Apartment Type</h4>
-        <div className="checkbox-group">
-          {apartmentTypes.map(type => (
-            <label key={type}>
-              <input
-                type="checkbox"
-                checked={filters.apartmentTypes.includes(type)}
-                onChange={() => handleApartmentTypeChange(type)}
-              />
-              {type}
-            </label>
-          ))}
-        </div>
+        <h4 id="filter-apartment-type">Apartment Type</h4>
+        <ChipGroup
+          labelId="filter-apartment-type"
+          options={apartmentTypes}
+          selected={filters.apartmentTypes}
+          onToggle={handleApartmentTypeChange}
+          isRare={o => o.count < rareThreshold}
+        />
       </div>
 
       <div className="filter-section">
-        <h4>Ward (Ku)</h4>
-        <div className="checkbox-group">
-          {wards.map(ward => (
-            <label key={ward}>
-              <input
-                type="checkbox"
-                checked={filters.wards.includes(ward)}
-                onChange={() => handleWardChange(ward)}
-              />
-              {ward}
-            </label>
-          ))}
-        </div>
+        <h4 id="filter-ward">Ward (Ku)</h4>
+        <ChipGroup
+          labelId="filter-ward"
+          options={wards}
+          selected={filters.wards}
+          onToggle={handleWardChange}
+        />
       </div>
     </div>
   );

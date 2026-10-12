@@ -13,6 +13,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
+from services.data_cleaning import valid_layout_mask
 from services.data_lineage_service import DATASET_STORE_DIR
 
 logger = logging.getLogger(__name__)
@@ -42,8 +43,10 @@ def latest_scrape(store_dir: Optional[Path] = None) -> Optional[Dict[str, Any]]:
 
 
 def to_dashboard_frame(raw: pd.DataFrame) -> pd.DataFrame:
-    """Raw scrape -> dashboard columns. Wards lose their 区 suffix and the walk time is `eki_walk`."""
-    df = raw.rename(columns={"nearest_eki_walk": "eki_walk"})
+    """Raw scrape -> dashboard columns. Wards lose their 区 suffix, the walk time is `eki_walk`,
+    and listings with an impossible layout are dropped."""
+    # Mis-parsed layouts ("16K") would otherwise show up as filter options
+    df = raw[valid_layout_mask(raw["apartment_type"])].rename(columns={"nearest_eki_walk": "eki_walk"})
     # The map joins on the ward name without the suffix ("中野"); the scrape stores "中野区"
     df["ku_name"] = df["ku_name"].astype(str).str.removesuffix("区")
     return df[DASHBOARD_COLUMNS]

@@ -2,7 +2,10 @@ import React, { useRef, useEffect } from 'react';
 import * as d3 from 'd3';
 import { getAverageRentByWard } from '../lib/dataUtils';
 
-const WardHeatmap = ({ data, width = 700, height = 500 }) => {
+// One line of text per ward, so the rows are sized for it rather than squeezed into a fixed height
+const ROW_HEIGHT = 26;
+
+const WardHeatmap = ({ data, width = 700 }) => {
   const svgRef = useRef(null);
 
   useEffect(() => {
@@ -11,12 +14,14 @@ const WardHeatmap = ({ data, width = 700, height = 500 }) => {
     // Clear previous chart
     d3.select(svgRef.current).selectAll('*').remove();
 
-    const margin = { top: 30, right: 150, bottom: 100, left: 150 };
+    const margin = { top: 30, right: 20, bottom: 20, left: 70 };
     const chartWidth = width - margin.left - margin.right;
-    const chartHeight = height - margin.top - margin.bottom;
 
     // Get ward statistics
     const wardStats = getAverageRentByWard(data);
+
+    const chartHeight = wardStats.length * ROW_HEIGHT;
+    const height = chartHeight + margin.top + margin.bottom;
 
     const svg = d3
       .select(svgRef.current)
@@ -98,8 +103,11 @@ const WardHeatmap = ({ data, width = 700, height = 500 }) => {
         tooltip.style('visibility', 'hidden');
       });
 
-    // Add value labels
-    svg
+    // One label per ward: average rent, then how many listings it is based on
+    const maxRent = d3.max(wardStats, w => w.avgRent);
+    const onDark = d => d.avgRent > maxRent * 0.6;
+
+    const labels = svg
       .selectAll('text.value-label')
       .data(wardStats)
       .enter()
@@ -110,26 +118,17 @@ const WardHeatmap = ({ data, width = 700, height = 500 }) => {
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
       .style('font-size', '12px')
-      .style('font-weight', 'bold')
-      .style('fill', d => d.avgRent > (d3.max(wardStats, w => w.avgRent) * 0.6) ? '#fff' : '#000')
-      .style('pointer-events', 'none')
-      .text(d => `¥${d.avgRent.toFixed(1)}`);
+      .style('fill', d => (onDark(d) ? '#fff' : '#000'))
+      .style('pointer-events', 'none');
 
-    // Add count labels
-    svg
-      .selectAll('text.count-label')
-      .data(wardStats)
-      .enter()
-      .append('text')
-      .attr('class', 'count-label')
-      .attr('x', cellWidth / 2)
-      .attr('y', d => yScale(d.ku_name) + yScale.bandwidth() / 2 + 15)
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'middle')
-      .style('font-size', '10px')
-      .style('fill', d => d.avgRent > (d3.max(wardStats, w => w.avgRent) * 0.6) ? '#fff' : '#666')
-      .style('pointer-events', 'none')
-      .text(d => `(${d.count} listings)`);
+    labels.append('tspan')
+      .style('font-weight', 'bold')
+      .text(d => `${d.avgRent.toFixed(1)}万円`);
+    labels.append('tspan')
+      .attr('dx', 8)
+      .style('font-size', '11px')
+      .style('fill', d => (onDark(d) ? 'rgba(255,255,255,0.85)' : '#555'))
+      .text(d => `${d.count.toLocaleString()} listings`);
 
     // Add Y axis (ward names)
     svg
@@ -153,7 +152,7 @@ const WardHeatmap = ({ data, width = 700, height = 500 }) => {
       tooltip.remove();
     };
 
-  }, [data, width, height]);
+  }, [data, width]);
 
   return <div ref={svgRef} style={{ overflow: 'auto' }}></div>;
 };

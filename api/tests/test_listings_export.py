@@ -79,3 +79,12 @@ def test_route_follows_a_new_scrape(store, api):
 
 def test_route_404_before_any_scrape(store, api):
     assert api.get("/data/listings").status_code == 404
+
+
+def test_dashboard_frame_drops_mis_parsed_layouts():
+    import pandas as pd
+    raw = pd.DataFrame({c: ["x", "x", "x"] for c in RAW_HEADER})
+    raw["apartment_type"] = ["1LDK", "16K", "ワンルーム"]
+    raw["ku_name"] = "港区"
+    out = listings_export.to_dashboard_frame(raw)
+    assert list(out["apartment_type"]) == ["1LDK", "ワンルーム"]

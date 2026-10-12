@@ -12,6 +12,7 @@ Dataset selection, in order:
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -29,6 +30,10 @@ MAX_RENT_PER_SQM = 1.5
 
 # Maintenance fees >= this are yen, not 万円 (1M yen/month is not a maintenance fee).
 YEN_MAINTENANCE_FLOOR = 100.0
+
+# Suumo room layouts: ワンルーム, or 1-9 rooms + optional S (service room) + K / DK / LDK.
+# Two-digit room counts ("16K", "42LDK") come from mis-parsed listings, e.g. a whole building.
+VALID_LAYOUT = r"ワンルーム|[1-9]S?(?:K|DK|LDK)"
 
 # Columns that no longer feed any model (contract_type was 0 in every scraped row)
 _DROPPED_COLUMNS = ["contract_type"]
@@ -77,6 +82,11 @@ def dataset_id(path) -> str:
     return p.parent.name if p.parent.parent == DATASET_VERSIONS_DIR else p.name
 
 
+def valid_layout_mask(layouts: pd.Series) -> pd.Series:
+    """True where the layout is a real one; a missing layout is kept (nothing to judge it by)."""
+    return layouts.isna() | layouts.astype(str).str.fullmatch(VALID_LAYOUT)
+
+
 def clean_listings(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, int]]:
     """Dedupe, fix units and drop implausible rows. Returns (cleaned, counts)."""
     report = {"rows_in": len(df)}
@@ -104,6 +114,11 @@ def clean_listings(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, int]]:
         plausible = per_sqm.between(MIN_RENT_PER_SQM, MAX_RENT_PER_SQM)
         report["implausible_rent_per_sqm_dropped"] = int((~plausible).sum())
         df = df[plausible]
+
+    if "apartment_type" in df.columns:
+        valid = valid_layout_mask(df["apartment_type"])
+        report["invalid_layout_dropped"] = int((~valid).sum())
+        df = df[valid]
 
     report["rows_out"] = len(df)
     return df.reset_index(drop=True), report
