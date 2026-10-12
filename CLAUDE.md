@@ -243,6 +243,9 @@ Calibrated on held-out buildings (grouped split); every candidate must also beat
 - `POST /retrain/check-and-execute` - Check drift and retrain if needed
 - `POST /retrain/force` - Force immediate retraining
 
+### Dashboard data
+- `GET /data/listings` - CSV of the newest raw scrape (`dataset_versions/*/manifest.json` with `kind: scrape`) in the frontend dashboard's columns (`services/listings_export.py`); ETag = dataset hash, gzip-compressed. The dashboard falls back to `frontend/public/tokyo_model.csv` when the API has no scrape
+
 ### MLflow Metadata
 - `GET /model/metadata?model_name=tokyo_rent_lgbm` - Get model metadata
 - `GET /model/metadata/all` - Get all models metadata

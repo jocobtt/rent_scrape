@@ -29,15 +29,17 @@ const InteractiveScatterPlot = ({ data }) => {
     const sortedSqm = data.map(d => d.sqr_m).sort(d3.ascending);
     const sortedRent = data.map(d => d.rent_price).sort(d3.ascending);
 
-    const xScale = d3
-      .scaleLinear()
-      .domain([0, d3.quantile(sortedSqm, 0.98) * 1.05])
-      .range([0, width]);
+    const xMax = d3.quantile(sortedSqm, 0.98) * 1.05;
+    const yMax = d3.quantile(sortedRent, 0.98) * 1.05;
 
-    const yScale = d3
-      .scaleLinear()
-      .domain([0, d3.quantile(sortedRent, 0.98) * 1.05])
-      .range([height, 0]);
+    const xScale = d3.scaleLinear().domain([0, xMax]).range([0, width]);
+    const yScale = d3.scaleLinear().domain([0, yMax]).range([height, 0]);
+
+    // The outliers beyond the axes are left out (svg overflow is visible, so they would spill out of the plot)
+    const visible = data.filter(d => d.sqr_m <= xMax && d.rent_price <= yMax);
+    // Smaller dots once there are thousands, or they merge into a blob
+    const dotRadius = visible.length > 5000 ? 3 : 6;
+    const dotStroke = visible.length > 5000 ? 0.5 : 1.5;
 
     const colorScale = d3
       .scaleOrdinal()
@@ -99,22 +101,22 @@ const InteractiveScatterPlot = ({ data }) => {
     // Points
     svg
       .selectAll('circle')
-      .data(data)
+      .data(visible)
       .enter()
       .append('circle')
       .attr('cx', d => xScale(d.sqr_m))
       .attr('cy', d => yScale(d.rent_price))
-      .attr('r', 6)
+      .attr('r', dotRadius)
       .attr('fill', d => colorScale(d.apartment_type))
       .attr('opacity', 0.7)
       .attr('stroke', '#fff')
-      .attr('stroke-width', 1.5)
+      .attr('stroke-width', dotStroke)
       .style('cursor', 'pointer')
       .on('mouseover', function (event, d) {
         d3.select(this)
           .transition()
           .duration(200)
-          .attr('r', 10)
+          .attr('r', dotRadius + 4)
           .attr('opacity', 1);
 
         tooltip
@@ -156,7 +158,7 @@ const InteractiveScatterPlot = ({ data }) => {
         d3.select(this)
           .transition()
           .duration(200)
-          .attr('r', 6)
+          .attr('r', dotRadius)
           .attr('opacity', 0.7);
 
         tooltip.style('opacity', 0);

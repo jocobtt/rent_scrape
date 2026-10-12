@@ -5,6 +5,7 @@ import os
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -13,7 +14,7 @@ from app_state import init_services
 from config.logging_config import get_logger, setup_logging
 from deps import limiter
 from middleware.logging_middleware import RequestBodyLoggingMiddleware, RequestLoggingMiddleware
-from routers import ab_testing, ensemble, explain, health, lineage, models, monitoring, predictions, torch_routes, training
+from routers import ab_testing, data, ensemble, explain, health, lineage, models, monitoring, predictions, torch_routes, training
 from schemas import InputData, _require_terms  # noqa: F401  (re-exported: tests and callers import them from here)
 
 # Setup logging (JSON format in production, colored console in development)
@@ -137,13 +138,16 @@ app.add_middleware(
     allow_headers = ["*"],
 )
 
+# The listings CSV is a few MB of repetitive text; everything else is tiny and skipped
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
 # Initialize services (S.<service>; see app_state.py)
 init_services(app)
 
 # Loads the models on first request and picks up registry promotions (see model_runtime.py)
 app.middleware("http")(model_runtime.load_model_middleware)
 
-for _router in (health, predictions, training, models, ensemble, monitoring, ab_testing, torch_routes, explain, lineage):
+for _router in (health, data, predictions, training, models, ensemble, monitoring, ab_testing, torch_routes, explain, lineage):
     app.include_router(_router.router)
 
 

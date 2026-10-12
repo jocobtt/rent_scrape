@@ -11,6 +11,7 @@ import DataFilters from '../components/DataFilters';
 import RentByWardChart from '../components/RentByWardChart';
 import ApartmentTypeDistribution from '../components/ApartmentTypeDistribution';
 import { parseTokyoRentData } from '../lib/dataUtils';
+import { fetchListingsCsv } from '../lib/listings';
 import './Dashboard.css';
 import '../styles/cta-button.css';
 
@@ -49,17 +50,15 @@ const Dashboard = () => {
   const [filters, setFilters] = useState(() => parseFiltersFromParams(searchParams));
 
   useEffect(() => {
-    const dataUrl = import.meta.env.VITE_DATA_URL || '/tokyo_model.csv';
-    fetch(dataUrl)
-      .then(response => response.text())
-      .then(csvText => {
+    fetchListingsCsv()
+      .then(({ csvText, source }) => {
         const processedData = parseTokyoRentData(csvText);
         setData(processedData);
         setIsLoading(false);
-        trackEvent('dashboard_viewed', { total_listings: processedData.length });
+        trackEvent('dashboard_viewed', { total_listings: processedData.length, data_source: source });
       })
       .catch(error => {
-        console.error('Error loading CSV:', error);
+        console.error('Error loading listings:', error);
         setIsLoading(false);
       });
   }, []);

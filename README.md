@@ -328,3 +328,7 @@ cd frontend
 npm install
 npm run dev   # http://localhost:5173, proxies prediction calls to the API on :8000
 ```
+
+The dashboard charts read the newest scrape from the API (`GET /data/listings`), so they
+update after each `scripts/scrape_dataset.py` run. Without a scrape (or API) it falls back to
+the small sample in `frontend/public/`.

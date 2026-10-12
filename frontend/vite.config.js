@@ -16,6 +16,7 @@ export default defineConfig({
       '^/model/':            API_ORIGIN,
       '/monitoring':         API_ORIGIN,
       '/health':             API_ORIGIN,
+      '/data':               API_ORIGIN,
       '/ensemble':           API_ORIGIN,
       '/torch':              API_ORIGIN,
     },
