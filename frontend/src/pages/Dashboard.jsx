@@ -12,6 +12,7 @@ import RentByWardChart from '../components/RentByWardChart';
 import ApartmentTypeDistribution from '../components/ApartmentTypeDistribution';
 import { parseTokyoRentData } from '../lib/dataUtils';
 import './Dashboard.css';
+import '../styles/cta-button.css';
 
 const DEFAULT_FILTERS = {
   apartmentTypes: [],

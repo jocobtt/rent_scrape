@@ -42,7 +42,7 @@
 }
 
 .stat-card-info::before {
-  background: #3b82f6;
+  background: var(--info);
 }
 
 .stat-card:hover {
@@ -80,7 +80,7 @@
 }
 
 .stat-dot-info {
-  background: #3b82f6;
+  background: var(--info);
 }
 
 .stat-content {

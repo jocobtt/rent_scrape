@@ -26,6 +26,23 @@
   --border-medium: #cbd5e1;
   --border-dark: #94a3b8;
 
+  /* Status Colors */
+  --danger: #ef4444;
+  --danger-dark: #dc2626;
+  --danger-light: #f87171;
+  --danger-bg: #fef2f2;
+  --danger-bg-strong: #fee2e2;
+  --danger-text: #b91c1c;
+  --danger-text-strong: #7f1d1d;
+  --warning: #f59e0b;
+  --warning-dark: #d97706;
+  --warning-light: #fbbf24;
+  --warning-bg: #fffbeb;
+  --warning-text: #92400e;
+  --caution-dark: #ea580c;
+  --success: #22c55e;
+  --info: #3b82f6;
+
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -342,4 +359,11 @@ svg text {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Shown while a lazily loaded page chunk downloads */
+.route-loading {
+  padding: var(--spacing-3xl) var(--spacing-lg);
+  text-align: center;
+  color: var(--text-tertiary);
 }

@@ -33,7 +33,7 @@
 }
 
 .model-info-error {
-  color: #ef4444;
+  color: var(--danger);
 }
 
 /* Compact Toggle Button */
@@ -110,17 +110,17 @@
 
 .model-status.active {
   background: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
+  color: var(--success);
 }
 
 .model-status.staging {
   background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
+  color: var(--warning);
 }
 
 .model-status.archived {
   background: rgba(107, 114, 128, 0.1);
-  color: #6b7280;
+  color: var(--text-tertiary);
 }
 
 /* Grid Layout */
