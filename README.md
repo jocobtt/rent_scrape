@@ -320,5 +320,11 @@ Roadmap:
 
 ## Frontend
 
-The D3.js / Vue front end lives in a separate repo:
-[jocobtt/rent_d3](https://github.com/jocobtt/rent_d3).
+The React / D3.js dashboard and rent predictor live in [`frontend/`](frontend/)
+(previously the separate `jocobtt/rent_d3` repo; its history was merged in).
+
+```bash
+cd frontend
+npm install
+npm run dev   # http://localhost:5173, proxies prediction calls to the API on :8000
+```
