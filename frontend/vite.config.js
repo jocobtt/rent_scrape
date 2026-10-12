@@ -11,7 +11,8 @@ export default defineConfig({
     proxy: {
       '/predict':            API_ORIGIN,
       '/challenger_predict': API_ORIGIN,
-      '/model':              API_ORIGIN,
+      // '^/model/' not '/model': the Predict Rent page itself lives at /model and must be served by Vite
+      '^/model/':            API_ORIGIN,
       '/monitoring':         API_ORIGIN,
       '/health':             API_ORIGIN,
       '/ensemble':           API_ORIGIN,

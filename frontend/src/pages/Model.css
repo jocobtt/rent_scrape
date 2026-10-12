@@ -100,10 +100,12 @@ select.form-control {
   box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
   position: relative;
   overflow: hidden;
+  isolation: isolate; /* keeps the hover overlay (::before) behind the label */
 }
 
 .btn-success::before {
   content: '';
+  z-index: -1;
   position: absolute;
   top: 0;
   left: 0;
@@ -224,10 +226,48 @@ select.form-control {
   margin-right: auto;
 }
 
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
 .prediction-history h3 {
   font-size: 1.125rem;
   color: var(--text-primary);
-  margin-bottom: var(--spacing-md);
+  margin: 0;
+}
+
+.history-clear-btn {
+  background: none;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.history-clear-btn:hover {
+  border-color: #f87171;
+  color: #dc2626;
+}
+
+.history-rerun-btn {
+  background: none;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.history-rerun-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
 .history-table-wrapper {
@@ -297,6 +337,23 @@ select.form-control {
   font-size: 0.8rem;
   color: var(--accent-color);
   font-weight: 500;
+}
+
+.field-hint {
+  display: block;
+  margin-top: var(--spacing-xs);
+  font-size: 0.8rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.method-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.method-card:disabled:hover {
+  border-color: var(--border-light);
+  background: var(--surface);
 }
 
 .optional-fields {

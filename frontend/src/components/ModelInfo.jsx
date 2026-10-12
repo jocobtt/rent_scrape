@@ -15,7 +15,6 @@ const ModelInfo = ({ compact = false }) => {
 
   const fetchModelMetadata = async () => {
     try {
-      // Replace with your actual MLflow endpoint
       const response = await api.get('/model/metadata', {
         timeout: 5000,
       });
@@ -133,7 +132,8 @@ const ModelInfo = ({ compact = false }) => {
         {modelData.metrics && (
           <div className="info-section">
             <h4>Performance Metrics</h4>
-            {Object.entries(modelData.metrics).map(([key, value]) => (
+            {/* per-seed scores are detail for the promotion gate; the multi-seed mean is shown */}
+            {Object.entries(modelData.metrics).filter(([key]) => !/^rmse_seed_\d+$/.test(key)).map(([key, value]) => (
               <div className="info-row" key={key}>
                 <span className="info-label">{key.replace(/_/g, ' ').toUpperCase()}:</span>
                 <span className="info-value metric">{formatMetric(value)}</span>

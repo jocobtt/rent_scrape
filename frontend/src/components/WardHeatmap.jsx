@@ -40,7 +40,8 @@ const WardHeatmap = ({ data, width = 700, height = 500 }) => {
       .domain([0, d3.max(wardStats, d => d.avgRent)])
       .interpolator(d3.interpolateYlOrRd);
 
-    // Tooltip
+    // Tooltip — remove any stale instance before creating a new one
+    d3.selectAll('.heatmap-tooltip').remove();
     const tooltip = d3
       .select('body')
       .append('div')

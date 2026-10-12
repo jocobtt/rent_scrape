@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useToast } from '../context/ToastContext';
 import useRateLimit from '../hooks/useRateLimit';
 import { trackEvent } from '../lib/posthog';
@@ -53,7 +53,9 @@ const Model = () => {
   const [kuName, setKuName] = useState('');
   const [apartmentType, setApartmentType] = useState('');
   const [houseType, setHouseType] = useState('');
-  const [contractType, setContractType] = useState('0');
+  const [address, setAddress] = useState('');
+  const [nearestStation, setNearestStation] = useState('');
+  const [nearestLine, setNearestLine] = useState('');
 
   // Model selection
   const [predictionMethod, setPredictionMethod] = useState('standard');
@@ -63,19 +65,44 @@ const Model = () => {
   // Results & state
   const [rentPrice, setRentPrice] = useState(null);
   const [resultModelType, setResultModelType] = useState(null);
+  const [resultVariant, setResultVariant] = useState(null);
+  // null while checking; the ensemble / deep-learning models only exist once they have been trained
+  const [available, setAvailable] = useState({ ensemble: null, torch: null });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('rentHistory') || '[]'); }
+    catch { return []; }
+  });
 
   const { showSuccess, showError, showWarning } = useToast();
+
+  useEffect(() => {
+    localStorage.setItem('rentHistory', JSON.stringify(history));
+  }, [history]);
+
+  useEffect(() => {
+    Promise.allSettled([
+      api.get('/ensemble/methods', { timeout: 5000 }),
+      api.get('/torch/models',     { timeout: 5000 }),
+    ]).then(([ens, torch]) => {
+      setAvailable({
+        ensemble: ens.status === 'fulfilled' && (ens.value.data?.ensemble_methods?.length ?? 0) > 0,
+        torch:    torch.status === 'fulfilled' && Boolean(torch.value.data?.available),
+      });
+    });
+  }, []);
+
+  // Only the Standard method can predict without deposit / key money
+  const termsRequired = predictionMethod !== 'standard';
 
   const validateForm = () => {
     const newErrors = {};
     if (!sqrM || sqrM < 5 || sqrM > 500)
       newErrors.sqrM = 'Enter a valid size (5–500 sqm)';
-    if (reiPrice === '' || reiPrice < 0 || reiPrice > 100)
+    if ((termsRequired || reiPrice !== '') && (reiPrice === '' || reiPrice < 0 || reiPrice > 100))
       newErrors.reiPrice = 'Enter key money (0–100 万円)';
-    if (shikikin === '' || shikikin < 0 || shikikin > 100)
+    if ((termsRequired || shikikin !== '') && (shikikin === '' || shikikin < 0 || shikikin > 100))
       newErrors.shikikin = 'Enter security deposit (0–100 万円)';
     if (maintenencePrice === '' || maintenencePrice < 0 || maintenencePrice > 50)
       newErrors.maintenencePrice = 'Enter maintenance fee (0–50 万円)';
@@ -91,8 +118,9 @@ const Model = () => {
 
   const buildBaseData = () => ({
     sqr_m:             parseFloat(sqrM),
-    rei_price:         parseFloat(reiPrice),
-    shikikin:          parseFloat(shikikin),
+    // Omitted when blank: the API then uses the model trained without deposit / key money
+    ...(reiPrice !== '' && { rei_price: parseFloat(reiPrice) }),
+    ...(shikikin !== '' && { shikikin: parseFloat(shikikin) }),
     maintenence_price: parseFloat(maintenencePrice),
     year_built:        parseFloat(yearBuilt),
     floor:             parseFloat(floor),
@@ -100,7 +128,10 @@ const Model = () => {
     ...(kuName        && { ku_name: kuName }),
     ...(apartmentType && { apartment_type: apartmentType }),
     ...(houseType     && { house_type: houseType }),
-    contract_type:     parseInt(contractType),
+    // Used by the no-deposit / key-money model to look at nearby rents
+    ...(address.trim()        && { address: address.trim() }),
+    ...(nearestStation.trim() && { nearest_station: nearestStation.trim() }),
+    ...(nearestLine.trim()    && { nearest_line: nearestLine.trim() }),
   });
 
   const fetchRentPrediction = async () => {
@@ -148,6 +179,7 @@ const Model = () => {
     setIsLoading(true);
     setRentPrice(null);
     setResultModelType(null);
+    setResultVariant(null);
     setErrors({});
 
     const startTime = Date.now();
@@ -158,11 +190,12 @@ const Model = () => {
 
       setRentPrice(result.prediction);
       setResultModelType(result.model_type || result.model_name || predictionMethod);
+      setResultVariant(result.variant || null);
       setHistory(prev => [{
         prediction: result.prediction,
         modelType: result.model_type || result.model_name || predictionMethod,
-        sqrM, yearBuilt, floor, ekiWalk, reiPrice, shikikin,
-        timestamp: new Date().toLocaleTimeString(),
+        sqrM, yearBuilt, floor, ekiWalk, reiPrice, shikikin, maintenencePrice,
+        timestamp: new Date().toISOString(),
       }, ...prev].slice(0, 5));
       showSuccess('Rent calculated successfully!');
 
@@ -175,12 +208,26 @@ const Model = () => {
       });
     } catch (error) {
       console.error('Error calculating rent:', error);
-      const msg = error.response?.data?.detail || error.message || 'Failed to calculate rent. Please try again.';
+      const isRateLimit = !error.response && error.message?.startsWith('Rate limit');
+      const msg = isRateLimit
+        ? error.message
+        : error.response?.data?.detail || error.message || 'Failed to calculate rent. Please try again.';
       showError(msg);
       trackEvent('rent_calculation_error', { error: error.message, sqrM, yearBuilt, prediction_method: predictionMethod });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRerun = (h) => {
+    setSqrM(h.sqrM);
+    setReiPrice(h.reiPrice);
+    setShikikin(h.shikikin);
+    setMaintenencePrice(h.maintenencePrice);
+    setYearBuilt(h.yearBuilt);
+    setFloor(h.floor);
+    setEkiWalk(h.ekiWalk);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const formatPrediction = (value) => {
@@ -212,27 +259,32 @@ const Model = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="reiPrice">Key Money 礼金 (万円): <span className="required">*</span></label>
+            <label htmlFor="reiPrice">Key Money 礼金 (万円): {termsRequired && <span className="required">*</span>}</label>
             <input
               type="number" id="reiPrice" value={reiPrice}
               onChange={(e) => setReiPrice(e.target.value)}
               className={`form-control ${errors.reiPrice ? 'error' : ''}`}
-              placeholder="e.g. 1" min="0" max="100" step="0.5" required
-              aria-required="true" aria-invalid={errors.reiPrice ? 'true' : 'false'}
+              placeholder={termsRequired ? 'e.g. 1' : 'e.g. 1 (optional)'} min="0" max="100" step="0.5"
+              aria-required={termsRequired} aria-invalid={errors.reiPrice ? 'true' : 'false'}
             />
             {errors.reiPrice && <span className="error-message" role="alert">{errors.reiPrice}</span>}
           </div>
 
           <div className="form-group">
-            <label htmlFor="shikikin">Security Deposit 敷金 (万円): <span className="required">*</span></label>
+            <label htmlFor="shikikin">Security Deposit 敷金 (万円): {termsRequired && <span className="required">*</span>}</label>
             <input
               type="number" id="shikikin" value={shikikin}
               onChange={(e) => setShikikin(e.target.value)}
               className={`form-control ${errors.shikikin ? 'error' : ''}`}
-              placeholder="e.g. 2" min="0" max="100" step="0.5" required
-              aria-required="true" aria-invalid={errors.shikikin ? 'true' : 'false'}
+              placeholder={termsRequired ? 'e.g. 2' : 'e.g. 2 (optional)'} min="0" max="100" step="0.5"
+              aria-required={termsRequired} aria-invalid={errors.shikikin ? 'true' : 'false'}
             />
             {errors.shikikin && <span className="error-message" role="alert">{errors.shikikin}</span>}
+            {!termsRequired && (
+              <span className="field-hint">
+                Optional: leave both blank if you don&apos;t know them yet (a street address below improves that estimate).
+              </span>
+            )}
           </div>
 
           <div className="form-group">
@@ -338,15 +390,34 @@ const Model = () => {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="contractType">Contract Type</label>
-                  <select
-                    id="contractType" value={contractType}
-                    onChange={(e) => setContractType(e.target.value)}
+                  <label htmlFor="address">Street address 住所</label>
+                  <input
+                    type="text" id="address" value={address} maxLength={100}
+                    onChange={(e) => setAddress(e.target.value)}
                     className="form-control"
-                  >
-                    <option value="0">普通借家 (Standard lease)</option>
-                    <option value="1">定期借家 (Fixed-term lease)</option>
-                  </select>
+                    placeholder="e.g. 東京都渋谷区猿楽町1"
+                  />
+                  <span className="field-hint">Used when deposit / key money are left blank: nearby rents sharpen the estimate.</span>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="nearestStation">Nearest station 最寄り駅</label>
+                  <input
+                    type="text" id="nearestStation" value={nearestStation} maxLength={50}
+                    onChange={(e) => setNearestStation(e.target.value)}
+                    className="form-control"
+                    placeholder="e.g. 代官山 (without 駅)"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="nearestLine">Line 路線</label>
+                  <input
+                    type="text" id="nearestLine" value={nearestLine} maxLength={50}
+                    onChange={(e) => setNearestLine(e.target.value)}
+                    className="form-control"
+                    placeholder="e.g. 東急東横線"
+                  />
                 </div>
               </div>
             )}
@@ -368,17 +439,23 @@ const Model = () => {
                 type="button"
                 className={`method-card ${predictionMethod === 'ensemble' ? 'active' : ''}`}
                 onClick={() => setPredictionMethod('ensemble')}
+                disabled={available.ensemble === false}
               >
                 <span className="method-card__name">Ensemble</span>
-                <span className="method-card__desc">Combine multiple models</span>
+                <span className="method-card__desc">
+                  {available.ensemble === false ? 'Not trained yet' : 'Combine multiple models'}
+                </span>
               </button>
               <button
                 type="button"
                 className={`method-card ${predictionMethod === 'torch' ? 'active' : ''}`}
                 onClick={() => setPredictionMethod('torch')}
+                disabled={available.torch === false}
               >
                 <span className="method-card__name">Deep Learning</span>
-                <span className="method-card__desc">TabPFN / TabNet / NN</span>
+                <span className="method-card__desc">
+                  {available.torch === false ? 'Not trained yet' : 'TabPFN / TabNet / NN'}
+                </span>
               </button>
             </div>
 
@@ -436,6 +513,9 @@ const Model = () => {
               {resultModelType && (
                 <span className="model-tag">{resultModelType}</span>
               )}
+              {resultVariant === 'no_terms' && (
+                <span className="field-hint">Estimated without deposit / key money.</span>
+              )}
             </div>
           )}
 
@@ -447,7 +527,10 @@ const Model = () => {
 
       {history.length > 0 && (
         <div className="prediction-history">
-          <h3>Recent Predictions</h3>
+          <div className="history-header">
+            <h3>Recent Predictions</h3>
+            <button className="history-clear-btn" onClick={() => setHistory([])}>Clear</button>
+          </div>
           <div className="history-table-wrapper">
             <table className="history-table">
               <thead>
@@ -461,6 +544,7 @@ const Model = () => {
                   <th>Key 礼金</th>
                   <th>Dep. 敷金</th>
                   <th>Time</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -472,9 +556,12 @@ const Model = () => {
                     <td>{h.yearBuilt}</td>
                     <td>{h.floor === '0' ? 'G' : `${h.floor}F`}</td>
                     <td>{h.ekiWalk}m</td>
-                    <td>{h.reiPrice}万</td>
-                    <td>{h.shikikin}万</td>
-                    <td>{h.timestamp}</td>
+                    <td>{h.reiPrice === '' ? '—' : `${h.reiPrice}万`}</td>
+                    <td>{h.shikikin === '' ? '—' : `${h.shikikin}万`}</td>
+                    <td>{new Date(h.timestamp).toLocaleTimeString()}</td>
+                    <td>
+                      <button className="history-rerun-btn" onClick={() => handleRerun(h)}>Re-use</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

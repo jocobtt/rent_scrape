@@ -195,6 +195,41 @@ select.form-control {
   box-shadow: var(--shadow-md);
 }
 
+.result-card--error {
+  border-color: #f87171;
+  background: #fef2f2;
+}
+
+.result-card--error .result-card__title {
+  color: #b91c1c;
+}
+
+.result-card--error p,
+.result-card--error code {
+  color: #7f1d1d;
+}
+
+.result-card--error code {
+  display: block;
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: #fee2e2;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+}
+
+.result-card--warn {
+  border-color: #fbbf24;
+  background: #fffbeb;
+  padding: var(--spacing-md) var(--spacing-xl);
+}
+
+.result-card--warn p {
+  color: #92400e;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
 .result-card__title {
   font-size: 1rem;
   font-weight: 700;

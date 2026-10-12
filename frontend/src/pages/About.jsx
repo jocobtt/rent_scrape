@@ -33,13 +33,25 @@ const About = () => {
 
         <h2>Machine Learning</h2>
         <p>
-          The rent predictor is powered by a <strong>LightGBM</strong> gradient boosting model
-          trained on the scraped data and served via a <strong>FastAPI</strong> backend. The
-          model pipeline includes automated challenger model evaluation, A/B testing between
-          model versions, drift monitoring with Evidently AI, and model registry management
-          through <strong>MLflow</strong>. Promotion from staging to production requires
-          meeting thresholds on RMSE, R², and MAPE — and at least a 2% improvement over
-          the current production model.
+          The rent predictor is served via a <strong>FastAPI</strong> backend with three
+          prediction modes. <strong>Standard</strong> uses a production LightGBM gradient
+          boosting model. <strong>Ensemble</strong> combines multiple models using weighted
+          averaging, simple averaging, stacking, or best-model routing.{' '}
+          <strong>Deep Learning</strong> offers TabPFN (a pretrained transformer for tabular
+          data), TabNet, and a custom PyTorch neural network.
+        </p>
+        <p>
+          The model pipeline includes automated challenger model evaluation, A/B testing
+          between model versions, drift monitoring with Evidently AI, and model registry
+          management through <strong>MLflow</strong>. Promotion from staging to production
+          requires meeting thresholds on RMSE, R², and MAPE — and at least a 2% improvement
+          over the current production model.
+        </p>
+        <p>
+          The <strong>Compare Models</strong> page runs all available models in parallel and
+          shows their predictions side by side, along with a confidence analysis (coefficient
+          of variation, agreement within 5%/10%) and a recommendation for which model best
+          suits the input.
         </p>
 
         <h2>Tech Stack</h2>

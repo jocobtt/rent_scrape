@@ -21,6 +21,12 @@ const features = [
     description: 'Get an instant rent estimate powered by a LightGBM model trained on Suumo listings. Enter your apartment details and predict.',
     to: '/model',
   },
+  {
+    icon: '⚖️',
+    title: 'Compare Models',
+    description: 'Run all models side by side — standard, ensemble, and deep learning — and see how their predictions, confidence, and recommendations differ.',
+    to: '/compare',
+  },
 ];
 
 const Home = () => {

@@ -14,7 +14,7 @@ const StatsCards = ({ data }) => {
 
     const avgRent = data.reduce((sum, d) => sum + d.rent_price, 0) / data.length;
     const avgSqm = data.reduce((sum, d) => sum + d.sqr_m, 0) / data.length;
-    const avgPricePerSqm = avgRent / avgSqm;
+    const avgPricePerSqm = avgSqm > 0 ? avgRent / avgSqm : 0;
 
     return {
       avgRent: avgRent.toFixed(1),

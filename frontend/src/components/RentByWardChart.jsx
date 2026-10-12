@@ -1,10 +1,13 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as d3 from 'd3';
 import { getAverageRentByWard } from '../lib/dataUtils';
+import useResizeObserver from '../hooks/useResizeObserver';
 
 const RentByWardChart = ({ data }) => {
   const chartRef = useRef(null);
   const [selectedWard, setSelectedWard] = useState(null);
+  const { resizeRef, dimensions } = useResizeObserver();
+  const totalWidth = dimensions?.width > 0 ? dimensions.width : 600;
 
   useEffect(() => {
     if (!data || data.length === 0 || !chartRef.current) return;
@@ -14,13 +17,13 @@ const RentByWardChart = ({ data }) => {
     const chartData = getAverageRentByWard(data);
 
     const margin = { top: 20, right: 70, bottom: 80, left: 60 };
-    const width = 600 - margin.left - margin.right;
+    const width = totalWidth - margin.left - margin.right;
     const height = 400 - margin.top - margin.bottom;
 
     const svg = d3
       .select(chartRef.current)
       .append('svg')
-      .attr('width', width + margin.left + margin.right)
+      .attr('width', totalWidth)
       .attr('height', height + margin.top + margin.bottom)
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
@@ -83,10 +86,10 @@ const RentByWardChart = ({ data }) => {
       .style('pointer-events', 'none')
       .text(d => `${d.avgRent.toFixed(1)}`);
 
-  }, [data]);
+  }, [data, totalWidth]);
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={resizeRef} style={{ position: 'relative' }}>
       <div ref={chartRef}></div>
 
       {selectedWard && (

@@ -1,8 +1,11 @@
 import React, { useRef, useEffect } from 'react';
 import * as d3 from 'd3';
+import useResizeObserver from '../hooks/useResizeObserver';
 
 const ApartmentTypeDistribution = ({ data }) => {
   const chartRef = useRef(null);
+  const { resizeRef, dimensions } = useResizeObserver();
+  const totalWidth = dimensions?.width > 0 ? dimensions.width : 600;
 
   useEffect(() => {
     if (!data || data.length === 0 || !chartRef.current) return;
@@ -23,13 +26,13 @@ const ApartmentTypeDistribution = ({ data }) => {
     })).sort((a, b) => b.count - a.count);
 
     const margin = { top: 20, right: 30, bottom: 80, left: 60 };
-    const width = 600 - margin.left - margin.right;
+    const width = totalWidth - margin.left - margin.right;
     const height = 400 - margin.top - margin.bottom;
 
     const svg = d3
       .select(chartRef.current)
       .append('svg')
-      .attr('width', width + margin.left + margin.right)
+      .attr('width', totalWidth)
       .attr('height', height + margin.top + margin.bottom)
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
@@ -88,9 +91,13 @@ const ApartmentTypeDistribution = ({ data }) => {
       .style('font-size', '12px')
       .text(d => d.count);
 
-  }, [data]);
+  }, [data, totalWidth]);
 
-  return <div ref={chartRef}></div>;
+  return (
+    <div ref={resizeRef} style={{ width: '100%' }}>
+      <div ref={chartRef}></div>
+    </div>
+  );
 };
 
 export default ApartmentTypeDistribution;

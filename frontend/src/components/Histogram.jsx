@@ -1,8 +1,11 @@
 import React, { useRef, useEffect } from 'react';
 import * as d3 from 'd3';
+import useResizeObserver from '../hooks/useResizeObserver';
 
-const Histogram = ({ data, field = 'rent_price', numBins = 20, width = 600, height = 400 }) => {
+const Histogram = ({ data, field = 'rent_price', numBins = 20, width: propWidth = 600, height = 400 }) => {
   const svgRef = useRef(null);
+  const { resizeRef, dimensions } = useResizeObserver();
+  const width = dimensions?.width > 0 ? dimensions.width : propWidth;
 
   useEffect(() => {
     if (!data || data.length === 0 || !svgRef.current) return;
@@ -122,7 +125,11 @@ const Histogram = ({ data, field = 'rent_price', numBins = 20, width = 600, heig
 
   }, [data, field, numBins, width, height]);
 
-  return <div ref={svgRef} style={{ overflow: 'auto' }}></div>;
+  return (
+    <div ref={resizeRef} style={{ width: '100%' }}>
+      <div ref={svgRef}></div>
+    </div>
+  );
 };
 
 const getFieldLabel = (field) => {

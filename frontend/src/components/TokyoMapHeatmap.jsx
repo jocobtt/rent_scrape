@@ -66,7 +66,8 @@ const TokyoMapHeatmap = ({ data, width = 800, height = 700 }) => {
       .domain([0, d3.max(wardStats, d => d.avgRent)])
       .interpolator(d3.interpolateYlOrRd);
 
-    // Tooltip
+    // Tooltip — remove any stale instance before creating a new one
+    d3.selectAll('.tokyo-map-tooltip').remove();
     const tooltip = d3
       .select('body')
       .append('div')

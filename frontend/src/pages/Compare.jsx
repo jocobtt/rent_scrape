@@ -239,6 +239,27 @@ const Compare = () => {
       {results && (
         <div className="compare-results">
 
+          {/* API failure error card */}
+          {!results.compare && (
+            <div className="result-card result-card--error">
+              <h3 className="result-card__title">Comparison unavailable</h3>
+              <p>The model API didn&apos;t respond. Check the backend is running:</p>
+              <code>cd ~/apps/rent_scrape/api &amp;&amp; ./start_api.sh</code>
+            </div>
+          )}
+
+          {/* Partial-failure notices */}
+          {results.compare && !results.confidence && (
+            <div className="result-card result-card--warn">
+              <p>Confidence analysis unavailable — ensemble endpoint may be offline.</p>
+            </div>
+          )}
+          {results.compare && !results.recommendations && (
+            <div className="result-card result-card--warn">
+              <p>Recommendations unavailable — ensemble endpoint may be offline.</p>
+            </div>
+          )}
+
           {/* 1. Prediction bars */}
           {results.compare && (() => {
             const models = buildModelList(results.compare);
