@@ -472,3 +472,45 @@
     min-width: 90px;
   }
 }
+
+/* ── Optional listing details (guided form) ── */
+.compare-listing {
+  margin: var(--spacing-xl) 0 var(--spacing-lg);
+  padding: var(--spacing-md) var(--spacing-lg) 0;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+}
+
+.compare-listing legend {
+  padding: 0 var(--spacing-sm);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.compare-listing legend span {
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
+.compare-listing .field-hint {
+  margin: 0 0 var(--spacing-md);
+}
+
+.compare-listing__grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.compare-listing__grid .form-group:last-child {
+  grid-column: auto;
+}
+
+@media (max-width: 640px) {
+  .compare-listing__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The quick-pick row sits directly above the submit button until a place is chosen */
+.compare-form-card .place-search__popular {
+  margin-bottom: var(--spacing-lg);
+}
