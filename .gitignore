@@ -43,6 +43,9 @@ api/prediction_logs/
 api/path/
 api/geo_cache/
 api/models/*-geo.json
+# Deep-model bundles installed from the registry (TabPFN is tens of MB)
+api/models/tabpfn-*
+api/models/tabnet-*
 api/scheduled_tasks.log
 # Checkpoints written by the deep-model training scripts (real models live in MLflow)
 api/*.pth

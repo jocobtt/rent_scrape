@@ -2,6 +2,7 @@
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.concurrency import run_in_threadpool
 
 from app_state import S
 from config.logging_config import PerformanceLogger, get_logger, log_prediction
@@ -11,6 +12,22 @@ from schemas import BatchPredictRequest, EnsemblePredictRequest, InputData, _req
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+async def _deep_predictions(input_dict: dict) -> dict:
+    """What each served deep model (TabPFN, TabNet) predicts, so agreement counts them too.
+    Models that fail are left out; none are served until they have been trained."""
+    service = S.torch_prediction_service
+    if service is None:
+        return {}
+    out = {}
+    for name in service.torch_models:
+        try:
+            result = await run_in_threadpool(service.predict_with_torch_model, input_dict, name)
+            out[name] = result["prediction"]
+        except Exception as e:
+            logger.warning(f"Deep model {name} left out of the agreement: {e}")
+    return out
 
 
 # Ensemble Prediction Endpoints
@@ -133,7 +150,8 @@ async def get_prediction_confidence(request: Request, data: InputData):
                 detail="Ensemble prediction service not available - models not loaded"
             )
         
-        result = S.ensemble_prediction_service.get_prediction_confidence(_require_terms(data))
+        input_dict = _require_terms(data)
+        result = S.ensemble_prediction_service.get_prediction_confidence(input_dict, await _deep_predictions(input_dict))
         
         return result
         
@@ -171,7 +189,8 @@ async def get_model_recommendations(request: Request, data: InputData):
                 detail="Ensemble prediction service not available - models not loaded"
             )
         
-        result = S.ensemble_prediction_service.get_model_recommendations(_require_terms(data))
+        input_dict = _require_terms(data)
+        result = S.ensemble_prediction_service.get_model_recommendations(input_dict, await _deep_predictions(input_dict))
         
         return result
         

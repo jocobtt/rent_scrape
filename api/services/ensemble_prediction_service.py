@@ -146,12 +146,14 @@ class EnsemblePredictionService(PredictionService):
             logger.error(f"Error comparing all predictions: {str(e)}")
             raise
     
-    def get_prediction_confidence(self, input_data: Dict[str, float]) -> Dict[str, Any]:
+    def get_prediction_confidence(self, input_data: Dict[str, float],
+                                  extra_predictions: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
         """
         Calculate prediction confidence based on model agreement.
         
         Args:
             input_data: Dictionary containing apartment features
+            extra_predictions: other models' predictions (the deep models) to include in the agreement
             
         Returns:
             Dict containing confidence metrics
@@ -167,6 +169,9 @@ class EnsemblePredictionService(PredictionService):
             if "ensemble_predictions" in all_predictions:
                 predictions.extend(all_predictions["ensemble_predictions"].values())
             
+            if extra_predictions:
+                predictions.extend(extra_predictions.values())
+
             predictions = np.array(predictions)
             
             # Calculate confidence metrics
@@ -205,7 +210,8 @@ class EnsemblePredictionService(PredictionService):
             logger.error(f"Error calculating prediction confidence: {str(e)}")
             raise
     
-    def get_model_recommendations(self, input_data: Dict[str, float]) -> Dict[str, Any]:
+    def get_model_recommendations(self, input_data: Dict[str, float],
+                                  extra_predictions: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
         """
         Recommend a model from how each performed on buildings it was not fitted on.
 
@@ -216,7 +222,7 @@ class EnsemblePredictionService(PredictionService):
             Dict containing model recommendations and reasoning
         """
         try:
-            confidence_analysis = self.get_prediction_confidence(input_data)
+            confidence_analysis = self.get_prediction_confidence(input_data, extra_predictions)
             consensus = confidence_analysis["prediction_range"]["mean"]  # 万円
             size = input_data.get('sqr_m', 0)
             age = input_data.get('year_built', 0)  # years since construction

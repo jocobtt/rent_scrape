@@ -61,3 +61,17 @@ def test_a_model_from_another_run_is_not_served(bundle_dir):
 
 def test_no_bundle_means_no_models(tmp_path):
     assert load_deep_models(tmp_path) == {}
+
+
+def test_repeated_identical_requests_run_the_model_once(bundle_dir):
+    """Compare fires /torch/compare-all, /ensemble/confidence and /ensemble/recommendations with the
+    same input; a slow model (TabPFN, ~10 s) must not repeat the work three times."""
+    path, *_ = bundle_dir
+    model = load_deep_models(path)["tokyo_rent_tabpfn"]
+    calls = []
+    real = model.fitted.predict
+    model.fitted.predict = lambda X: calls.append(1) or real(X)
+    first = model.predict_single(dict(INPUT))
+    assert model.predict_single(dict(INPUT)) == first and len(calls) == 1
+    model.predict_single({**INPUT, "sqr_m": 31.0})
+    assert len(calls) == 2

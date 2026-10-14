@@ -122,3 +122,17 @@ def test_out_of_fold_predictions_never_see_the_row_they_predict(tmp_path):
     # a memorising model fitted on the whole set would be near-exact; held-out buildings are not
     in_sample = LGBMRegressor(n_estimators=300, min_child_samples=1, num_leaves=64, verbose=-1).fit(X, y)
     assert rmse(oof["challenger"], y_out) > 3 * rmse(in_sample.predict(X), y_out)
+
+
+def test_confidence_counts_the_deep_models_too():
+    from services.ensemble_prediction_service import EnsemblePredictionService
+    svc = EnsemblePredictionService.__new__(EnsemblePredictionService)
+    svc.compare_all_predictions = lambda data: {
+        "predictions": {"passed_model": 35.0, "challenger_model": 33.0},
+        "ensemble_predictions": {"ensemble_voting": 34.0},
+    }
+    alone = svc.get_prediction_confidence({})
+    with_deep = svc.get_prediction_confidence({}, {"tokyo_rent_tabpfn": 44.0})
+    assert alone["prediction_range"]["max"] == 35.0 and alone["model_agreement"]["total_models"] == 3
+    assert with_deep["prediction_range"]["max"] == 44.0 and with_deep["model_agreement"]["total_models"] == 4
+    assert with_deep["coefficient_of_variation"] > alone["coefficient_of_variation"]

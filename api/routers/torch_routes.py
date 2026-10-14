@@ -1,5 +1,6 @@
 """PyTorch neural-network predictions and training."""
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.concurrency import run_in_threadpool
 
 from app_state import S
 from config.logging_config import PerformanceLogger, get_logger, log_prediction
@@ -37,7 +38,9 @@ async def predict_with_torch_model(request: Request, data: TorchPredictRequest):
             
             # Make prediction
             input_dict = _require_terms(data.input_data)
-            result = S.torch_prediction_service.predict_with_torch_model(input_dict, data.model_name)
+            # TabPFN takes seconds per prediction; keep it off the event loop so the API stays responsive
+            result = await run_in_threadpool(
+                S.torch_prediction_service.predict_with_torch_model, input_dict, data.model_name)
 
             # Log prediction for monitoring
             log_prediction(logger, f"torch_{data.model_name}", input_dict, result["prediction"],
@@ -128,7 +131,8 @@ async def compare_all_models_with_torch(request: Request, data: InputData):
                 )
             return S.prediction_service.compare_predictions(data.dict())
         
-        result = S.torch_prediction_service.compare_all_predictions_with_torch(_require_terms(data))
+        result = await run_in_threadpool(
+            S.torch_prediction_service.compare_all_predictions_with_torch, _require_terms(data))
         return result
         
     except HTTPException:

@@ -51,9 +51,9 @@ const Compare = () => {
 
     const [compareRes, confidenceRes, recsRes] = await Promise.allSettled(full
       ? [
-        api.post('/torch/compare-all',        input, { timeout: 20000 }),
-        api.post('/ensemble/confidence',      input, { timeout: 15000 }),
-        api.post('/ensemble/recommendations', input, { timeout: 15000 }),
+        api.post('/torch/compare-all',        input, { timeout: 60000 }), // TabPFN alone takes ~10 s
+        api.post('/ensemble/confidence',      input, { timeout: 30000 }),
+        api.post('/ensemble/recommendations', input, { timeout: 30000 }),
       ]
       : [api.post('/compare_predictions', input, { timeout: 15000 })]);
 

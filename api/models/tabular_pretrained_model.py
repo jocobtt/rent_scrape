@@ -183,14 +183,18 @@ def train_tabpfn_model():
         # TabPFN has limitations on dataset size
         # TabPFN conditions on the whole training set at inference, so cost grows fast with
         # rows. Subsample (randomly, see below) to keep CPU inference tractable.
-        MAX_SAMPLES = int(os.environ.get("TABPFN_MAX_SAMPLES", "4000"))
+        # The model is served per request on CPU, and every prediction runs the whole context through
+        # the network: ~10 s at 1000 rows, ~30 s at 2000, ~90 s at 4000 (8 ensemble members). So the
+        # context stays small. (TabPFN's fit_mode="fit_with_cache" would avoid that but gave
+        # wrong predictions in tabpfn 6.0.5: RMSE 21 against 4.9 on the same data.)
+        MAX_SAMPLES = int(os.environ.get("TABPFN_MAX_SAMPLES", "1000"))
         MAX_FEATURES = 100
 
         # Context size/sampling: tuned on a grouped validation slice of the training buildings
-        # (TABPFN_TUNE=0 skips it and uses TABPFN_MAX_SAMPLES with random sampling)
-        strategy, tuning_results = "random", []
+        # (TABPFN_TUNE=0 skips it and uses TABPFN_MAX_SAMPLES with TABPFN_STRATEGY, default random)
+        strategy, tuning_results = os.environ.get("TABPFN_STRATEGY", "random"), []
         if os.environ.get("TABPFN_TUNE", "1") == "1" and len(X_train) > MAX_SAMPLES:
-            sizes = [int(v) for v in os.environ.get("TABPFN_CONTEXT_SIZES", "4000,8000").split(",")]
+            sizes = [int(v) for v in os.environ.get("TABPFN_CONTEXT_SIZES", "500,1000").split(",")]
             best, tuning_results = tune_tabpfn(X_train, y_train, groups_for(df_for_lineage, X_train), sizes)
             MAX_SAMPLES, strategy = best["context_size"], best["strategy"]
             logger.info(f"TabPFN tuned context: {strategy}, {MAX_SAMPLES} rows")

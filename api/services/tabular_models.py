@@ -5,7 +5,9 @@ Each is a bundle written by `models/tabular_pretrained_model.py` and installed b
 (the `FeaturePreprocessor` it was trained with). These models need every feature, deposit and key
 money included, which is why the torch routes require both.
 """
+import json
 import logging
+import threading
 from pathlib import Path
 from typing import Any, Dict, Union
 
@@ -39,6 +41,8 @@ class TabularModel:
         self.fitted = model
         self.preprocessor = preprocessor
         self.run_id = run_id
+        self._cache: Dict[str, float] = {}  # repeated identical requests (compare + confidence + recommendations)
+        self._lock = threading.Lock()  # one prediction at a time per model (CPU-bound; state is not known to be thread-safe)
         self.model_type = DEEP_VARIANTS[variant][1]
 
     @classmethod
@@ -52,8 +56,14 @@ class TabularModel:
 
     def predict_single(self, input_data: Dict[str, Any]) -> float:
         # Neither model takes NaN: a missing deposit / key money would be the training median
+        key = json.dumps(input_data, sort_keys=True, default=str)
         row = self.preprocessor.transform_single(input_data, impute_missing=True).astype(float)
-        return float(np.ravel(self.fitted.predict(row.values))[0])
+        with self._lock:
+            if key not in self._cache:
+                if len(self._cache) >= 256:
+                    self._cache.clear()
+                self._cache[key] = float(np.ravel(self.fitted.predict(row.values))[0])
+            return self._cache[key]
 
     def describe(self) -> Dict[str, Any]:
         return {
