@@ -3,6 +3,7 @@ import { useToast } from '../context/ToastContext';
 import useRateLimit from '../hooks/useRateLimit';
 import useRentForm from '../hooks/useRentForm';
 import useModelAvailability from '../hooks/useModelAvailability';
+import useMarketData from '../hooks/useMarketData';
 import usePredictionHistory from '../hooks/usePredictionHistory';
 import { trackEvent } from '../lib/posthog';
 import { buildRentInput, formatYen, formatMan } from '../lib/rentForm';
@@ -11,6 +12,8 @@ import RentFormFields from '../components/RentFormFields';
 import OptionalDetails from '../components/model/OptionalDetails';
 import PredictionMethodSelector from '../components/model/PredictionMethodSelector';
 import PredictionHistory from '../components/model/PredictionHistory';
+import GuidedEstimator from '../components/model/GuidedEstimator';
+import ChoiceChips from '../components/model/ChoiceChips';
 import ModelInfo from '../components/ModelInfo';
 import './Model.css';
 
@@ -28,8 +31,14 @@ const requestPrediction = async (method, input, { ensembleMethod, torchModel }) 
   return res.data;
 };
 
+const MODES = [{ value: 'Quick estimate' }, { value: 'Exact listing' }];
+
 const Model = () => {
-  const { values, errors, onChange, loadValues, setErrors, validate } = useRentForm();
+  const { values, errors, onChange, setField, loadValues, setErrors, validate } = useRentForm();
+  const market = useMarketData();
+  const [exact, setExact] = useState(false);
+  // The guided flow needs the area medians; without them (no scrape yet, API down) only the exact form works
+  const guided = !exact && market.data !== null;
   const { history, addEntry, clear: clearHistory } = usePredictionHistory();
   const availability = useModelAvailability();
   const { showSuccess, showError, showWarning } = useToast();
@@ -126,10 +135,30 @@ const Model = () => {
     <div className="model">
       <div className="model__title">
         <h1>Calculate your rent!</h1>
-        <h2>Input apartment parameters:</h2>
+        <h2>{guided ? 'Pick where you want to live; we start from what is typical there.' : 'Input apartment parameters:'}</h2>
       </div>
 
       <div className="model__content">
+        {market.data && (
+          <div className="model__mode" id="model-mode">
+            <ChoiceChips
+              name="mode" labelId="model-mode" options={MODES}
+              value={exact ? 'Exact listing' : 'Quick estimate'}
+              onChange={(v) => setExact(v === 'Exact listing')}
+            />
+          </div>
+        )}
+
+        {market.loading && <p className="field-hint" role="status">Loading area data…</p>}
+
+        {guided && (
+          <GuidedEstimator
+            market={market.data} values={values} setField={setField} loadValues={loadValues}
+            onRefine={() => setExact(true)}
+          />
+        )}
+
+        {!market.loading && !guided && (
         <form className="model__form" onSubmit={handleSubmit} noValidate>
           <RentFormFields
             values={values} errors={errors} onChange={onChange} termsRequired={termsRequired}
@@ -170,6 +199,7 @@ const Model = () => {
             * Estimated from historical data. Actual prices may vary. Limited to 20 calculations per minute.
           </p>
         </form>
+        )}
       </div>
 
       <PredictionHistory history={history} onClear={clearHistory} onReuse={handleReuse} />

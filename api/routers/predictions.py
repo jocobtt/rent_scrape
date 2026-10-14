@@ -12,12 +12,14 @@ router = APIRouter()
 
 @router.post("/predict", tags=["Predictions"])
 @limiter.limit(PREDICTION_RATE_LIMIT)
-async def predict_main(request: Request, data: InputData):
+async def predict_main(request: Request, data: InputData, log: bool = True):
     """
     Predict rent price using the passed (production) model.
 
     Args:
         data: InputData containing apartment features
+        log: set false for exploratory calls (the form's live estimate) so they don't
+            enter the drift-monitoring log
 
     Returns:
         dict: Dictionary containing the prediction
@@ -32,15 +34,16 @@ async def predict_main(request: Request, data: InputData):
         result = S.prediction_service.predict_with_passed_model(data.dict())
 
         # Log prediction for drift monitoring
-        try:
-            result["prediction_id"] = S.data_capture_service.log_prediction(
-                model_type="passed",
-                input_features=data.dict(),
-                prediction=result["prediction"],
-                variant=result.get("variant"),
-            )
-        except Exception as log_error:
-            logger.warning(f"Failed to log prediction: {log_error}")
+        if log:
+            try:
+                result["prediction_id"] = S.data_capture_service.log_prediction(
+                    model_type="passed",
+                    input_features=data.dict(),
+                    prediction=result["prediction"],
+                    variant=result.get("variant"),
+                )
+            except Exception as log_error:
+                logger.warning(f"Failed to log prediction: {log_error}")
 
         return result
 
@@ -56,12 +59,13 @@ async def predict_main(request: Request, data: InputData):
 
 @router.post("/challenger_predict", tags=["Predictions"])
 @limiter.limit(PREDICTION_RATE_LIMIT)
-async def challenger_predict(request: Request, data: InputData):
+async def challenger_predict(request: Request, data: InputData, log: bool = True):
     """
     Predict rent price using the challenger model (LightGBM).
 
     Args:
         data: InputData containing apartment features
+        log: set false for exploratory calls so they don't enter the drift-monitoring log
 
     Returns:
         dict: Dictionary containing the prediction
@@ -76,15 +80,16 @@ async def challenger_predict(request: Request, data: InputData):
         result = S.prediction_service.predict_with_challenger_model(data.dict())
 
         # Log prediction for drift monitoring
-        try:
-            result["prediction_id"] = S.data_capture_service.log_prediction(
-                model_type="challenger",
-                input_features=data.dict(),
-                prediction=result["prediction"],
-                variant=result.get("variant"),
-            )
-        except Exception as log_error:
-            logger.warning(f"Failed to log prediction: {log_error}")
+        if log:
+            try:
+                result["prediction_id"] = S.data_capture_service.log_prediction(
+                    model_type="challenger",
+                    input_features=data.dict(),
+                    prediction=result["prediction"],
+                    variant=result.get("variant"),
+                )
+            except Exception as log_error:
+                logger.warning(f"Failed to log prediction: {log_error}")
 
         return result
 

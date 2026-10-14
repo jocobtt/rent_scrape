@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import '../styles/chip.css';
 
 /**
  * Multi-select as a wrap of pill-shaped checkboxes, each with its listing count.

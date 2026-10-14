@@ -457,3 +457,9 @@
     min-width: unset;
   }
 }
+
+.model__mode {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--spacing-xl);
+}

@@ -246,6 +246,9 @@ Calibrated on held-out buildings (grouped split); every candidate must also beat
 ### Dashboard data
 - `GET /data/listings` - CSV of the newest raw scrape (`dataset_versions/*/manifest.json` with `kind: scrape`) in the frontend dashboard's columns (`services/listings_export.py`); ETag = dataset hash, gzip-compressed. The dashboard falls back to `frontend/public/tokyo_model.csv` when the API has no scrape
 
+- `GET /data/market` - Medians per ward, layout and station from the same newest scrape (`services/market_summary.py`, cells under 5 listings omitted; rents in 万円). The Predict Rent page's guided flow uses it for starting values and the "vs typical" comparison
+- `POST /predict` and `/challenger_predict` accept `?log=false` to skip the drift-monitoring log; the guided form's live estimates use it so slider-dragging doesn't enter the logged data
+
 ### MLflow Metadata
 - `GET /model/metadata?model_name=tokyo_rent_lgbm` - Get model metadata
 - `GET /model/metadata/all` - Get all models metadata

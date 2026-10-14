@@ -1,4 +1,8 @@
+from unittest.mock import MagicMock
+
 import pytest
+
+from app_state import S
 
 
 class TestHealth:
@@ -79,6 +83,20 @@ class TestPredictions:
     def test_predict_returns_correct_value(self, client, valid_input, mock_prediction_svc):
         response = client.post("/predict", json=valid_input)
         assert response.json()["prediction"] == 12.5
+
+    def test_predict_log_false_skips_the_drift_log(self, client, valid_input, mock_prediction_svc, monkeypatch):
+        capture = MagicMock()
+        monkeypatch.setattr(S, "data_capture_service", capture)
+        assert client.post("/predict?log=false", json=valid_input).json()["prediction"] == 12.5
+        capture.log_prediction.assert_not_called()
+        client.post("/predict", json=valid_input)
+        capture.log_prediction.assert_called_once()
+
+    def test_challenger_predict_log_false_skips_the_drift_log(self, client, valid_input, mock_prediction_svc, monkeypatch):
+        capture = MagicMock()
+        monkeypatch.setattr(S, "data_capture_service", capture)
+        client.post("/challenger_predict?log=false", json=valid_input)
+        capture.log_prediction.assert_not_called()
 
     def test_challenger_predict_success(self, client, valid_input, mock_prediction_svc):
         response = client.post("/challenger_predict", json=valid_input)
