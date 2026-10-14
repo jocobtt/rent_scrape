@@ -98,6 +98,18 @@ class TestPredictions:
         client.post("/challenger_predict?log=false", json=valid_input)
         capture.log_prediction.assert_not_called()
 
+    def test_torch_predict_log_false_skips_the_drift_log(self, client, valid_input, monkeypatch):
+        capture = MagicMock()
+        torch_svc = MagicMock()
+        torch_svc.predict_with_torch_model.return_value = {"prediction": 12.5}
+        monkeypatch.setattr(S, "data_capture_service", capture)
+        monkeypatch.setattr(S, "torch_prediction_service", torch_svc)
+        body = {"model_name": "tokyo_rent_tabnet", "input_data": {**valid_input, "rei_price": 1, "shikikin": 2}}
+        assert client.post("/torch/predict?log=false", json=body).status_code == 200
+        capture.log_prediction.assert_not_called()
+        client.post("/torch/predict", json=body)
+        capture.log_prediction.assert_called_once()
+
     def test_challenger_predict_success(self, client, valid_input, mock_prediction_svc):
         response = client.post("/challenger_predict", json=valid_input)
         assert response.status_code == 200

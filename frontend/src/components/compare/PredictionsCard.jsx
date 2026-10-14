@@ -33,12 +33,12 @@ const STAT_CHIPS = (s) => [
   ['Models run', s.total_models],
 ];
 
-const PredictionsCard = ({ compare }) => {
+const PredictionsCard = ({ compare, pending = [] }) => {
   const models = buildModelList(compare);
   const stats = compare.comprehensive_statistics;
   const vals = models.map((m) => m.value);
-  const minVal = Math.min(...vals);
-  const spread = Math.max(...vals) - minVal || 1;
+  const minVal = vals.length ? Math.min(...vals) : 0;
+  const spread = vals.length ? Math.max(...vals) - minVal || 1 : 1;
   // Bars are scaled to the spread, with a floor so the lowest one stays visible
   const barWidth = (v) => Math.max(12, Math.round(12 + 88 * (v - minVal) / spread));
 
@@ -64,6 +64,13 @@ const PredictionsCard = ({ compare }) => {
             </div>
           );
         })}
+        {pending.map((key) => (
+          <div key={key} className="pred-row pred-row--pending" aria-busy="true">
+            <span className="pred-row__label">{(MODEL_META[key] || { label: key }).label}</span>
+            <div className="pred-row__track"><div className="pred-row__bar pred-row__bar--pending" /></div>
+            <span className="pred-row__value">running…</span>
+          </div>
+        ))}
       </div>
 
       {stats && (

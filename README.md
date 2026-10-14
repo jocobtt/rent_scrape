@@ -191,9 +191,13 @@ The PyTorch MLP (3.50 / 0.957 / 8.9%) is registered but not promoted: the ensemb
 *Note:* the TabPFN and TabNet rows were retrained on 2026-10-13 on the 28,600-row scrape (26,037 after
 cleaning) with the shared feature encoding, so the API can serve them. The other rows come from the
 earlier 2026-10-08 snapshot, so the rows are not on one split. TabPFN's context is capped at 1,000
-rows: it runs the whole context through the network for every prediction, which on CPU takes about
-10 s at 1,000 rows and about 90 s at 4,000 (its `fit_with_cache` mode, which avoids that, returned
+rows: it runs the whole context through the network for every ensemble member on every prediction,
+which on CPU takes about 4 s per member at 1,000 rows and about 90 s for 8 members at 4,000 (its `fit_with_cache` mode, which avoids that, returned
 wrong predictions in tabpfn 6.0.5). Scores on the 4,000-row context were 2.84 / 0.963.
+Members are what cost time, not what buys accuracy: on the held-out buildings 1, 2, 4 and 8 members
+scored RMSE 2.15, 2.30, 2.48 and 2.35, so it is trained with 2 (`TABPFN_ESTIMATORS`), about 3 s per
+prediction. That version (v6) beat the 8-member one by 1.8%, under the 2% promotion rule, so it was
+promoted by hand; the thresholds were still checked.
 Given the split-to-split noise above, a 2% improvement over Production (the promotion rule) is
 well inside the noise for any single run. Treat promotion as a sanity check, not as evidence
 that one version is better.

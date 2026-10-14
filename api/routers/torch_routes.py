@@ -18,12 +18,13 @@ router = APIRouter()
 
 @router.post("/torch/predict", tags=["PyTorch Predictions"])
 @limiter.limit(PREDICTION_RATE_LIMIT)
-async def predict_with_torch_model(request: Request, data: TorchPredictRequest):
+async def predict_with_torch_model(request: Request, data: TorchPredictRequest, log: bool = True):
     """
     Make predictions using PyTorch neural network models
     
     - **model_name**: Name of the PyTorch model (e.g., 'tabular', 'ensemble', 'transformer')
     - **input_data**: Apartment features for prediction
+    - **log**: `false` keeps the request out of the drift-monitoring log (the Compare page fires the same input more than once)
     """
     with PerformanceLogger("torch_prediction", logger):
         try:
@@ -45,9 +46,10 @@ async def predict_with_torch_model(request: Request, data: TorchPredictRequest):
             # Log prediction for monitoring
             log_prediction(logger, f"torch_{data.model_name}", input_dict, result["prediction"],
                            result.get("processing_time_ms", 0), request_id)
-            S.data_capture_service.log_prediction(
-                model_type=f"torch_{data.model_name}", input_features=input_dict,
-                prediction=result["prediction"], source="api")
+            if log:
+                S.data_capture_service.log_prediction(
+                    model_type=f"torch_{data.model_name}", input_features=input_dict,
+                    prediction=result["prediction"], source="api")
 
             result["request_id"] = request_id
             return result

@@ -514,3 +514,11 @@
 .compare-form-card .place-search__popular {
   margin-bottom: var(--spacing-lg);
 }
+
+.pred-row--pending .pred-row__value { color: var(--text-muted, #94a3b8); font-style: italic; }
+.pred-row__bar--pending {
+  width: 100%; background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.45), transparent);
+  background-size: 200% 100%; animation: pred-shimmer 1.4s linear infinite;
+}
+@keyframes pred-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .pred-row__bar--pending { animation: none; } }
