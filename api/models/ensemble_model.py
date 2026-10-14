@@ -1,405 +1,270 @@
 """
-Ensemble model implementation for combining multiple ML models.
+Ensembles of the shared LightGBM ("challenger") and linear ("passed") models.
 
-This module provides various ensemble methods to combine predictions from
-the challenger (LightGBM) and passed (Linear) models for improved performance.
+An ensemble here combines the base models' *predictions*, so it needs no feature handling of
+its own: serving asks each base model through `PredictionService` (which applies the right
+preprocessor) and hands the numbers to `EnsembleModel.combine`.
+
+Training fits the combiner on grouped out-of-fold predictions: fresh clones of the two served
+models are fitted on all-but-one fold of buildings and predict the held-out fold, so every
+row's prediction comes from a model that never saw its building. (Fitting on the served
+models' own held-out rows would need their exact train/test split, which changes whenever the
+data cleaning does.) Deposit and key money are present throughout: these are the models the
+ensemble routes serve, and those routes require both.
+
+    cd api && uv run python models/ensemble_model.py
 """
 
+import logging
 import os
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import joblib
 import numpy as np
 import pandas as pd
-import joblib
-import mlflow
-import logging
-from typing import Dict, Any, List, Tuple, Optional
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from sklearn.ensemble import VotingRegressor
-from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.preprocessing import StandardScaler
-import lightgbm as lgb
+from scipy.optimize import minimize
+from sklearn.base import clone
+from sklearn.linear_model import Ridge
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import GroupKFold
 
-import sys
 # Make `services` importable when run as a script (python models/<name>.py)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.data_split import (
-    attach_groups, groups_for, grouped_train_test_split,
-    grouped_train_val_test_split, split_meta,
-)
-
 logger = logging.getLogger(__name__)
 
-mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
+MODELS_DIR = Path(__file__).resolve().parent
+METHODS = ("weighted_average", "stacking", "voting", "dynamic_weights")
+BASE_MODELS = ("challenger", "passed")  # also the order of the prediction matrix columns
+# `dynamic_weights` keeps a separate blend per predicted-rent band; a band needs this many rows
+MIN_BAND_ROWS = 200
+N_BANDS = 3
+
+
+def ensemble_path(method: str) -> Path:
+    return MODELS_DIR / f"ensemble_{method}_model.joblib"
+
+
+def _blend_weights(P: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """Non-negative weights summing to 1 that minimise squared error of P @ w."""
+    k = P.shape[1]
+    res = minimize(
+        lambda w: float(np.mean((P @ w - y) ** 2)),
+        x0=np.full(k, 1.0 / k), bounds=[(0.0, 1.0)] * k,
+        constraints={"type": "eq", "fun": lambda w: w.sum() - 1.0}, method="SLSQP",
+    )
+    return res.x if res.success else np.full(k, 1.0 / k)
 
 
 class EnsembleModel:
-    """
-    Ensemble model class that combines multiple base models using various strategies.
-    """
-    
-    def __init__(self, method='weighted_average'):
-        """
-        Initialize ensemble model.
-        
-        Args:
-            method: Ensemble method ('weighted_average', 'stacking', 'voting', 'dynamic_weights')
-        """
+    """Combines base-model predictions with one of `METHODS`."""
+
+    def __init__(self, method: str = "weighted_average", base_names: Optional[List[str]] = None):
+        if method not in METHODS:
+            raise ValueError(f"Unknown ensemble method: {method}")
         self.method = method
-        self.base_models = {}
-        self.weights = {}
-        self.meta_model = None
-        self.scaler = StandardScaler()
+        self.base_names = list(base_names or BASE_MODELS)
+        self.weights: Dict[str, float] = {n: 1.0 / len(self.base_names) for n in self.base_names}
+        self.meta_model: Optional[Ridge] = None
+        self.band_edges: Optional[np.ndarray] = None     # dynamic_weights: predicted-rent cut points
+        self.band_weights: Optional[np.ndarray] = None   # one weight row per band
+        self.meta: Dict = {}                             # provenance (training rows, base runs, ...)
         self.is_trained = False
-        
-    def add_model(self, name: str, model, weight: float = 1.0):
-        """Add a base model to the ensemble."""
-        self.base_models[name] = model
-        self.weights[name] = weight
-        
-    def _weighted_average_predict(self, X: pd.DataFrame) -> np.ndarray:
-        """Make predictions using weighted average ensemble."""
-        predictions = []
-        total_weight = sum(self.weights.values())
-        
-        for name, model in self.base_models.items():
-            pred = model.predict(X)
-            weighted_pred = pred * (self.weights[name] / total_weight)
-            predictions.append(weighted_pred)
-            
-        return np.sum(predictions, axis=0)
-    
-    def _stacking_predict(self, X: pd.DataFrame) -> np.ndarray:
-        """Make predictions using stacking ensemble."""
-        # Generate base model predictions
-        base_predictions = np.column_stack([
-            model.predict(X) for model in self.base_models.values()
-        ])
-        
-        # Use meta-model to make final prediction
-        if self.meta_model is None:
-            raise ValueError("Meta-model not trained for stacking")
-            
-        return self.meta_model.predict(base_predictions)
-    
-    def _voting_predict(self, X: pd.DataFrame) -> np.ndarray:
-        """Make predictions using voting ensemble."""
-        predictions = [model.predict(X) for model in self.base_models.values()]
-        return np.mean(predictions, axis=0)
-    
-    def _dynamic_weights_predict(self, X: pd.DataFrame) -> np.ndarray:
-        """
-        Make predictions using dynamic weights based on feature characteristics.
-        Different models might perform better on different types of input.
-        """
-        predictions = []
-        
-        for i, row in X.iterrows():
-            model_predictions = []
-            confidence_weights = []
-            
-            for name, model in self.base_models.items():
-                pred = model.predict(row.to_frame().T)[0]
-                
-                # Calculate confidence based on feature characteristics
-                # Higher rent values might favor one model over another
-                rent_factor = row.get('rei_price', 0)
-                size_factor = row.get('sqr_m', 0)
-                
-                if name == 'challenger':  # LightGBM - better for complex patterns
-                    confidence = 0.6 if rent_factor > 100000 else 0.4
-                    confidence += 0.1 if size_factor > 50 else -0.1
-                else:  # Linear model - better for simpler patterns
-                    confidence = 0.4 if rent_factor > 100000 else 0.6
-                    confidence += -0.1 if size_factor > 50 else 0.1
-                
-                model_predictions.append(pred)
-                confidence_weights.append(max(0.1, min(0.9, confidence)))
-            
-            # Normalize weights
-            total_weight = sum(confidence_weights)
-            normalized_weights = [w / total_weight for w in confidence_weights]
-            
-            # Calculate weighted prediction
-            weighted_pred = sum(p * w for p, w in zip(model_predictions, normalized_weights))
-            predictions.append(weighted_pred)
-            
-        return np.array(predictions)
-    
-    def fit(self, X_train: pd.DataFrame, y_train: pd.Series, X_val: pd.DataFrame = None, y_val: pd.Series = None):
-        """
-        Train the ensemble model.
-        
-        Args:
-            X_train: Training features
-            y_train: Training targets
-            X_val: Validation features (for stacking)
-            y_val: Validation targets (for stacking)
-        """
-        if self.method == 'stacking':
-            if X_val is None or y_val is None:
-                # Use cross-validation to generate meta-features
-                from sklearn.model_selection import KFold
-                
-                kf = KFold(n_splits=5, shuffle=True, random_state=42)
-                meta_features = np.zeros((len(X_train), len(self.base_models)))
-                
-                for fold, (train_idx, val_idx) in enumerate(kf.split(X_train)):
-                    X_fold_train = X_train.iloc[train_idx]
-                    y_fold_train = y_train.iloc[train_idx]
-                    X_fold_val = X_train.iloc[val_idx]
-                    
-                    for i, (name, model) in enumerate(self.base_models.items()):
-                        # Clone and fit model on fold
-                        fold_model = self._clone_model(model)
-                        fold_model.fit(X_fold_train, y_fold_train)
-                        
-                        # Predict on validation fold
-                        meta_features[val_idx, i] = fold_model.predict(X_fold_val)
-                
-                # Train meta-model
-                self.meta_model = Ridge(alpha=1.0)
-                self.meta_model.fit(meta_features, y_train)
-            else:
-                # Use provided validation set
-                base_predictions = np.column_stack([
-                    model.predict(X_val) for model in self.base_models.values()
-                ])
-                
-                self.meta_model = Ridge(alpha=1.0)
-                self.meta_model.fit(base_predictions, y_val)
-        
-        # Optimize weights for weighted average method
-        if self.method == 'weighted_average':
-            self._optimize_weights(X_train, y_train)
-            
+
+    # -- helpers -----------------------------------------------------------
+    def _matrix(self, preds: Dict[str, np.ndarray]) -> np.ndarray:
+        missing = [n for n in self.base_names if n not in preds]
+        if missing:
+            raise ValueError(f"Missing base predictions: {missing}")
+        return np.column_stack([np.asarray(preds[n], dtype=float) for n in self.base_names])
+
+    # -- training ----------------------------------------------------------
+    def fit(self, preds: Dict[str, np.ndarray], y) -> "EnsembleModel":
+        """Fit on base predictions for rows the base models did not train on."""
+        P, y = self._matrix(preds), np.asarray(y, dtype=float)
+        if self.method == "weighted_average":
+            self.weights = dict(zip(self.base_names, _blend_weights(P, y)))
+        elif self.method == "stacking":
+            self.meta_model = Ridge(alpha=1.0).fit(P, y)
+        elif self.method == "dynamic_weights":
+            self._fit_bands(P, y)
         self.is_trained = True
-        
-    def _clone_model(self, model):
-        """Create a clone of the model."""
-        if hasattr(model, 'get_params'):
-            # sklearn-like model
-            from sklearn.base import clone
-            return clone(model)
-        else:
-            # For joblib-loaded models, this is trickier
-            # For now, return the same model (not ideal for CV)
-            return model
-            
-    def _optimize_weights(self, X: pd.DataFrame, y: pd.Series):
-        """Optimize weights using grid search."""
-        from sklearn.model_selection import ParameterGrid
-        
-        best_score = float('inf')
-        best_weights = self.weights.copy()
-        
-        # Create parameter grid for weights
-        weight_options = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-        model_names = list(self.base_models.keys())
-        
-        if len(model_names) == 2:
-            for w1 in weight_options:
-                w2 = 1.0 - w1
-                test_weights = {model_names[0]: w1, model_names[1]: w2}
-                
-                # Temporarily set weights
-                old_weights = self.weights.copy()
-                self.weights = test_weights
-                
-                # Evaluate
-                predictions = self._weighted_average_predict(X)
-                score = mean_squared_error(y, predictions)
-                
-                if score < best_score:
-                    best_score = score
-                    best_weights = test_weights.copy()
-                
-                # Restore old weights
-                self.weights = old_weights
-        
-        self.weights = best_weights
-        logger.info(f"Optimized weights: {self.weights}")
-        
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
-        """Make predictions using the ensemble."""
+        return self
+
+    def _fit_bands(self, P: np.ndarray, y: np.ndarray) -> None:
+        """A blend per predicted-rent band: a linear model may serve cheap flats better and
+        trees the expensive tail, so the weights follow the level of the base predictions."""
+        level = P.mean(axis=1)
+        self.band_edges = np.quantile(level, np.linspace(0, 1, N_BANDS + 1)[1:-1])
+        overall = _blend_weights(P, y)
+        band = np.searchsorted(self.band_edges, level)
+        rows = []
+        for b in range(N_BANDS):
+            in_band = band == b
+            rows.append(_blend_weights(P[in_band], y[in_band]) if in_band.sum() >= MIN_BAND_ROWS else overall)
+        self.band_weights = np.vstack(rows)
+
+    # -- prediction --------------------------------------------------------
+    def combine(self, preds: Dict[str, np.ndarray]) -> np.ndarray:
+        """Final prediction(s) from the base models' predictions."""
         if not self.is_trained:
             raise ValueError("Ensemble model must be trained before making predictions")
-            
-        if self.method == 'weighted_average':
-            return self._weighted_average_predict(X)
-        elif self.method == 'stacking':
-            return self._stacking_predict(X)
-        elif self.method == 'voting':
-            return self._voting_predict(X)
-        elif self.method == 'dynamic_weights':
-            return self._dynamic_weights_predict(X)
-        else:
-            raise ValueError(f"Unknown ensemble method: {self.method}")
-    
-    def evaluate(self, X_test: pd.DataFrame, y_test: pd.Series) -> Dict[str, float]:
-        """Evaluate the ensemble model."""
-        predictions = self.predict(X_test)
-        
+        P = self._matrix(preds)
+        if self.method == "weighted_average":
+            return P @ np.array([self.weights[n] for n in self.base_names])
+        if self.method == "stacking":
+            return self.meta_model.predict(P)
+        if self.method == "voting":
+            return P.mean(axis=1)
+        band = np.searchsorted(self.band_edges, P.mean(axis=1))
+        return np.einsum("ij,ij->i", P, self.band_weights[band])
+
+    def evaluate(self, preds: Dict[str, np.ndarray], y) -> Dict[str, float]:
+        out = self.combine(preds)
         return {
-            'rmse': np.sqrt(mean_squared_error(y_test, predictions)),
-            'mae': mean_absolute_error(y_test, predictions),
-            'r2': r2_score(y_test, predictions),
-            'mse': mean_squared_error(y_test, predictions)
+            "rmse": float(np.sqrt(mean_squared_error(y, out))),
+            "mae": float(mean_absolute_error(y, out)),
+            "r2": float(r2_score(y, out)),
+            "mse": float(mean_squared_error(y, out)),
         }
-    
-    def save(self, filepath: str):
-        """Save the ensemble model."""
-        ensemble_data = {
-            'method': self.method,
-            'weights': self.weights,
-            'meta_model': self.meta_model,
-            'is_trained': self.is_trained
-        }
-        joblib.dump(ensemble_data, filepath)
-        
-    def load(self, filepath: str, base_models: Dict):
-        """Load the ensemble model."""
-        ensemble_data = joblib.load(filepath)
-        self.method = ensemble_data['method']
-        self.weights = ensemble_data['weights']
-        self.meta_model = ensemble_data['meta_model']
-        self.is_trained = ensemble_data['is_trained']
-        self.base_models = base_models
+
+    # -- persistence -------------------------------------------------------
+    def save(self, filepath) -> None:
+        joblib.dump({
+            "method": self.method, "base_names": self.base_names, "weights": self.weights,
+            "meta_model": self.meta_model, "band_edges": self.band_edges,
+            "band_weights": self.band_weights, "meta": self.meta, "is_trained": self.is_trained,
+        }, filepath)
+
+    @classmethod
+    def load(cls, filepath) -> "EnsembleModel":
+        data = joblib.load(filepath)
+        model = cls(method=data["method"], base_names=data["base_names"])
+        model.weights = data["weights"]
+        model.meta_model = data["meta_model"]
+        model.band_edges = data["band_edges"]
+        model.band_weights = data["band_weights"]
+        model.meta = data.get("meta", {})
+        model.is_trained = data["is_trained"]
+        return model
+
+    def describe(self) -> Dict:
+        """What `/ensemble/methods` reports for this ensemble."""
+        if self.method == "stacking" and self.meta_model is not None:
+            weights = dict(zip(self.base_names, map(float, self.meta_model.coef_)))
+        elif self.method == "dynamic_weights" and self.band_weights is not None:
+            weights = {n: [float(w) for w in self.band_weights[:, i]] for i, n in enumerate(self.base_names)}
+        else:
+            weights = {n: float(w) for n, w in self.weights.items()}
+        return {"weights": weights, "method_type": self.method, **self.meta}
 
 
-def load_data_for_ensemble():
-    """Load and prepare data for ensemble training."""
+# ---------------------------------------------------------------------------
+# Training data: grouped out-of-fold predictions of fresh clones of the served models
+# ---------------------------------------------------------------------------
+
+def _encoded_frame(df: pd.DataFrame):
+    """(X, y, groups, preprocessor) the way challenger_model / reg_model build them (no geo)."""
+    import re
+    from services.data_split import group_labels
+    from services.feature_preprocessor import FeaturePreprocessor
+
+    df = df.rename(columns=lambda c: re.sub("[^A-Za-z0-9_]+", "", c))
+    encoded, _ = FeaturePreprocessor().fit_transform(df)
+    return encoded.drop("rent_price", axis=1), encoded["rent_price"], group_labels(df)
+
+
+def out_of_fold_predictions(df: pd.DataFrame, n_splits: int = 5, models_dir: Path = MODELS_DIR):
+    """Predictions of the two base models for every row, each from a clone fitted without that
+    row's building. Returns ({name: predictions}, y, groups)."""
+    from services.feature_preprocessor import mask_optional_terms
+
+    X, y, groups = _encoded_frame(df)
+    if groups is None or groups.nunique() < n_splits:
+        raise RuntimeError("Need building / address groups to build leakage-free ensemble training data")
+    recipes = {name: joblib.load(models_dir / f"{name}-model.joblib") for name in BASE_MODELS}
+    oof = {name: np.full(len(X), np.nan) for name in BASE_MODELS}
+
+    for fold, (tr, va) in enumerate(GroupKFold(n_splits=n_splits).split(X, y, groups)):
+        for name, recipe in recipes.items():
+            # The shared LightGBM is trained with deposit / key money hidden on a share of rows;
+            # the linear model sees them throughout (see challenger_model.load_data)
+            X_tr = mask_optional_terms(X.iloc[tr]) if name == "challenger" else X.iloc[tr]
+            model = clone(recipe).fit(X_tr, y.iloc[tr])
+            oof[name][va] = model.predict(X.iloc[va])
+        logger.info("Out-of-fold fold %d/%d done", fold + 1, n_splits)
+    return oof, y.to_numpy(), groups.to_numpy()
+
+
+def train_ensemble_models(ensemble_methods: Optional[List[str]] = None, dataset: Optional[str] = None,
+                          models_dir: Path = MODELS_DIR):
+    """Fit every ensemble method and save it to `models/ensemble_<method>_model.joblib`.
+
+    Each method is scored on buildings its blend weights were not fitted on (a grouped half
+    split of the out-of-fold predictions), then refitted on everything for serving.
+    Returns {method: {"model", "metrics", "base_metrics", "improvement_vs_best_base"}}.
+    """
+    import mlflow
+    from sklearn.model_selection import GroupShuffleSplit
     from services.data_cleaning import load_training_frame
-    df = load_training_frame()  # DATASET_PATH env var, else the newest scraped dataset
-    
-    # Preprocessing (same as individual models)
-    df, groups = split_meta(df)  # group labels for leakage-free splits
-    df['ku_name'] = df['ku_name'].astype('category')
-    df = pd.get_dummies(df, columns=['ku_name'])
-    df['apartment_type'] = df['apartment_type'].astype('category')
-    df = pd.get_dummies(df, columns=['apartment_type'])
-    df['house_type'] = df['house_type'].astype('category')
-    df = pd.get_dummies(df, columns=['house_type'])
-    
-    X = df.drop('rent_price', axis=1)
-    y = df['rent_price']
-    
-    X_train, X_test, y_train, y_test, _ = grouped_train_test_split(X, y, groups, test_size=0.2, random_state=42)
-    return X_train, X_test, y_train, y_test
 
+    methods = list(ensemble_methods or METHODS)
+    df = load_training_frame(dataset)
+    oof, y, groups = out_of_fold_predictions(df, models_dir=models_dir)
 
-def train_ensemble_models(ensemble_methods: List[str] = None):
-    """
-    Train multiple ensemble models and compare their performance.
-    
-    Args:
-        ensemble_methods: List of ensemble methods to train
-        
-    Returns:
-        Dict containing trained ensemble models and their performance
-    """
-    if ensemble_methods is None:
-        ensemble_methods = ['weighted_average', 'stacking', 'voting', 'dynamic_weights']
-    
-    # Load data
-    X_train, X_test, y_train, y_test = load_data_for_ensemble()
-    
-    # Load base models
-    models_dir = os.path.join(os.path.dirname(__file__), '..')
-    challenger_model = joblib.load(os.path.join(models_dir, 'challenger-model.joblib'))
-    passed_model = joblib.load(os.path.join(models_dir, 'passed-model.joblib'))
-    
+    fit_idx, eval_idx = next(GroupShuffleSplit(n_splits=1, test_size=0.5, random_state=42).split(y, y, groups))
+    take = lambda preds, idx: {n: p[idx] for n, p in preds.items()}  # noqa: E731
+    base_metrics = {
+        n: {"rmse": float(np.sqrt(mean_squared_error(y[eval_idx], p[eval_idx]))),
+            "r2": float(r2_score(y[eval_idx], p[eval_idx]))}
+        for n, p in oof.items()
+    }
+    best_base = min(m["rmse"] for m in base_metrics.values())
+
+    meta = {"training_rows": int(len(y)), "folds": 5, "base_runs": _base_runs(models_dir)}
     results = {}
-    
-    with mlflow.start_run(run_name="ensemble_comparison") as run:
-        mlflow.log_param("ensemble_methods", ensemble_methods)
-        mlflow.log_param("train_size", len(X_train))
-        mlflow.log_param("test_size", len(X_test))
-        
-        for method in ensemble_methods:
-            print(f"\n{'='*60}")
-            print(f"Training {method.upper()} Ensemble")
-            print(f"{'='*60}")
-            
-            # Create ensemble
-            ensemble = EnsembleModel(method=method)
-            ensemble.add_model('challenger', challenger_model, weight=0.6)
-            ensemble.add_model('passed', passed_model, weight=0.4)
-            
-            # Train ensemble
-            try:
-                ensemble.fit(X_train, y_train, X_test, y_test)
-                
-                # Evaluate ensemble
-                metrics = ensemble.evaluate(X_test, y_test)
-                
-                # Evaluate individual models for comparison
-                challenger_pred = challenger_model.predict(X_test)
-                passed_pred = passed_model.predict(X_test)
-                
-                challenger_rmse = np.sqrt(mean_squared_error(y_test, challenger_pred))
-                passed_rmse = np.sqrt(mean_squared_error(y_test, passed_pred))
-                
-                print(f"\n{method.upper()} Results:")
-                print(f"  Ensemble RMSE: {metrics['rmse']:.2f}")
-                print(f"  Challenger RMSE: {challenger_rmse:.2f}")
-                print(f"  Passed RMSE: {passed_rmse:.2f}")
-                print(f"  Ensemble R²: {metrics['r2']:.4f}")
-                
-                # Log metrics to MLflow
-                with mlflow.start_run(run_name=f"ensemble_{method}", nested=True):
-                    mlflow.log_params({
-                        "method": method,
-                        "base_models": "challenger,passed",
-                        "weights": str(ensemble.weights)
-                    })
-                    
-                    for metric_name, value in metrics.items():
-                        mlflow.log_metric(f"ensemble_{metric_name}", value)
-                    
-                    mlflow.log_metric("challenger_rmse", challenger_rmse)
-                    mlflow.log_metric("passed_rmse", passed_rmse)
-                    mlflow.log_metric("improvement_vs_challenger", challenger_rmse - metrics['rmse'])
-                    mlflow.log_metric("improvement_vs_passed", passed_rmse - metrics['rmse'])
-                    
-                    # Save ensemble model
-                    ensemble_path = f"ensemble_{method}_model.joblib"
-                    ensemble.save(ensemble_path)
-                    mlflow.log_artifact(ensemble_path)
-                
-                results[method] = {
-                    'model': ensemble,
-                    'metrics': metrics,
-                    'improvement_vs_best_base': min(challenger_rmse, passed_rmse) - metrics['rmse']
-                }
-                
-            except Exception as e:
-                logger.error(f"Error training {method} ensemble: {e}")
-                continue
-        
-        # Find best ensemble method
-        if results:
-            best_method = min(results.keys(), key=lambda k: results[k]['metrics']['rmse'])
-            best_ensemble = results[best_method]
-            
-            print(f"\n{'='*60}")
-            print(f"BEST ENSEMBLE: {best_method.upper()}")
-            print(f"RMSE: {best_ensemble['metrics']['rmse']:.2f}")
-            print(f"Improvement: {best_ensemble['improvement_vs_best_base']:.2f}")
-            print(f"{'='*60}")
-            
-            mlflow.log_metric("best_ensemble_rmse", best_ensemble['metrics']['rmse'])
-            mlflow.log_param("best_method", best_method)
-    
+    with mlflow.start_run(run_name="ensemble_comparison"):
+        mlflow.log_param("ensemble_methods", methods)
+        mlflow.log_param("rows", len(y))
+        for n, m in base_metrics.items():
+            mlflow.log_metric(f"{n}_rmse", m["rmse"])
+
+        for method in methods:
+            held_out = EnsembleModel(method).fit(take(oof, fit_idx), y[fit_idx])
+            metrics = held_out.evaluate(take(oof, eval_idx), y[eval_idx])
+            final = EnsembleModel(method).fit(oof, y)  # served: all rows
+            final.meta = {**meta, "eval_rmse": metrics["rmse"], "eval_r2": metrics["r2"]}
+            path = Path(models_dir) / f"ensemble_{method}_model.joblib"
+            final.save(path)
+
+            with mlflow.start_run(run_name=f"ensemble_{method}", nested=True):
+                mlflow.log_param("method", method)
+                for k, v in metrics.items():
+                    mlflow.log_metric(f"ensemble_{k}", v)
+                mlflow.log_metric("improvement_vs_best_base", best_base - metrics["rmse"])
+                mlflow.log_artifact(str(path))
+
+            logger.info("%-17s RMSE %.3f  R² %.4f  (best base %.3f)", method, metrics["rmse"], metrics["r2"], best_base)
+            results[method] = {
+                "model": final, "metrics": metrics, "base_metrics": base_metrics,
+                "improvement_vs_best_base": best_base - metrics["rmse"],
+            }
     return results
 
 
+def _base_runs(models_dir: Path) -> Dict[str, Optional[str]]:
+    """MLflow run id of each base model's files (from the bundle stamp), for traceability."""
+    from services.model_sync import local_run_id
+    return {name: local_run_id(models_dir, name) for name in BASE_MODELS}
+
+
 if __name__ == "__main__":
-    # Train all ensemble methods
-    results = train_ensemble_models()
-    
-    # Print summary
-    print("\nEnsemble Model Training Complete!")
-    for method, result in results.items():
-        metrics = result['metrics']
-        print(f"{method}: RMSE={metrics['rmse']:.2f}, R²={metrics['r2']:.4f}")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    import mlflow
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
+    outcome = train_ensemble_models()
+    for name, r in outcome.items():
+        print(f"{name:17s} RMSE {r['metrics']['rmse']:.3f}  R² {r['metrics']['r2']:.4f}  "
+              f"vs best base {r['improvement_vs_best_base']:+.3f}")

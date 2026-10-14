@@ -53,33 +53,56 @@ mlflow.set_tracking_uri(mlflow_uri)
 logger.info(f"MLflow tracking URI: {mlflow_uri}")
 
 
-def load_data():
-    """Load and preprocess the Tokyo rent dataset"""
-    from services.data_cleaning import load_training_frame
-    df = load_training_frame()  # DATASET_PATH env var, else the newest scraped dataset
+# Like the LightGBM / linear trainers, files go to staging/ and the registry decides what is served
+# (services/model_sync.py): a candidate that is not promoted must not replace the served model.
+MODELS_DIR = os.path.dirname(os.path.abspath(__file__))
+OUT_DIR = os.getenv("MODEL_OUT_DIR", os.path.join(MODELS_DIR, "staging"))
+
+
+def load_data(dataset=None, info=None):
+    """Features and a grouped split, encoded exactly like the LightGBM and linear models
+    (`FeaturePreprocessor`) so the API builds the same columns at prediction time.
+
+    `info`, if given, is filled with the fitted `preprocessor` and the `dataset` id: what
+    `save_bundle` needs to make the trained model servable.
+    """
+    from services.data_cleaning import dataset_id, load_training_frame, resolve_dataset_path
+    from services.feature_preprocessor import FeaturePreprocessor
+
+    path = resolve_dataset_path(dataset)
+    df = load_training_frame(str(path))  # DATASET_PATH env var, else the newest scraped dataset
 
     # Preprocessing
     logger.info("Preprocessing data...")
     df, groups = split_meta(df)  # keep group labels, drop identifier columns
-    df['ku_name'] = df['ku_name'].astype('category')
-    df = pd.get_dummies(df, columns=['ku_name'], prefix='ku')
-
-    df['apartment_type'] = df['apartment_type'].astype('category')
-    df = pd.get_dummies(df, columns=['apartment_type'], prefix='apt')
-
-    df['house_type'] = df['house_type'].astype('category')
-    df = pd.get_dummies(df, columns=['house_type'], prefix='house')
+    preprocessor = FeaturePreprocessor()
+    encoded, _ = preprocessor.fit_transform(df)
+    if info is not None:
+        info.update(preprocessor=preprocessor, dataset=dataset_id(path))
 
     # get_dummies yields bool columns; torch/TabPFN need a purely numeric float matrix
-    X = df.drop('rent_price', axis=1).astype(float)
-    y = df['rent_price']
+    X = encoded.drop('rent_price', axis=1).astype(float)
+    y = encoded['rent_price']
 
     logger.info(f"Data loaded: {X.shape[0]} samples, {X.shape[1]} features")
 
     # Hold out whole buildings so near-duplicate units can't leak into the test set
     X_train, X_test, y_train, y_test, _ = grouped_train_test_split(X, y, groups, test_size=0.2, random_state=42)
-    df_for_lineage = attach_groups(df.copy(), groups)
+    df_for_lineage = attach_groups(encoded.copy(), groups)
     return X_train, X_test, y_train, y_test, df_for_lineage
+
+
+def save_bundle(variant, model, info, run_id):
+    """Write `<variant>-model.joblib` + `-features.json` to OUT_DIR, stamp them with the run and
+    dataset, and log them to the MLflow run under `bundle/` (what model_sync installs from)."""
+    from services.artifact_bundle import stamp
+
+    os.makedirs(OUT_DIR, exist_ok=True)
+    joblib.dump(model, os.path.join(OUT_DIR, f"{variant}-model.joblib"))
+    info["preprocessor"].save(os.path.join(OUT_DIR, f"{variant}-features.json"))
+    stamp(OUT_DIR, variant, run_id, dataset=info["dataset"])
+    for suffix in ("model.joblib", "features.json"):
+        mlflow.log_artifact(os.path.join(OUT_DIR, f"{variant}-{suffix}"), "bundle")
 
 
 def calculate_mape(y_true, y_pred):
@@ -154,7 +177,8 @@ def train_tabpfn_model():
         from tabpfn import TabPFNRegressor
 
         # Load data
-        X_train, X_test, y_train, y_test, df_for_lineage = load_data()
+        info = {}
+        X_train, X_test, y_train, y_test, df_for_lineage = load_data(info=info)
 
         # TabPFN has limitations on dataset size
         # TabPFN conditions on the whole training set at inference, so cost grows fast with
@@ -183,6 +207,7 @@ def train_tabpfn_model():
 
             X_train_sample = X_train_sample[top_features]
             X_test_sample = X_test[top_features]
+            info["preprocessor"].feature_columns_ = top_features  # serving builds only these
 
             logger.info(f"Selected top {len(top_features)} features")
         else:
@@ -260,6 +285,7 @@ def train_tabpfn_model():
             model_path = "tabpfn_model.pkl"
             joblib.dump(model, model_path)
             mlflow.log_artifact(model_path)
+            save_bundle("tabpfn", model, info, run_id)
 
             # Register model
             mlflow.sklearn.log_model(
@@ -375,7 +401,8 @@ def train_tabnet_model():
         import torch
 
         # Load data
-        X_train, X_test, y_train, y_test, df_for_lineage = load_data()
+        info = {}
+        X_train, X_test, y_train, y_test, df_for_lineage = load_data(info=info)
         X_train_split, X_val, y_train_split, y_val, _ = grouped_train_test_split(
             X_train, y_train, groups_for(df_for_lineage, X_train), test_size=0.2, random_state=42
         )
@@ -503,6 +530,7 @@ def train_tabnet_model():
             model_path = "tabnet_model.pkl"
             joblib.dump(model, model_path)
             mlflow.log_artifact(model_path)
+            save_bundle("tabnet", model, info, run_id)
 
             # Register model
             mlflow.sklearn.log_model(
@@ -565,7 +593,7 @@ def train_tabnet_model():
 
 
 def check_promotion(model_name: str):
-    """Check if model should be auto-promoted"""
+    """Check if model should be auto-promoted, then serve whatever the registry now calls Production"""
     logger.info("="*70)
     logger.info(f"CHECKING AUTO-PROMOTION FOR {model_name.upper()}")
     logger.info("="*70)
@@ -591,6 +619,15 @@ def check_promotion(model_name: str):
 
     except Exception as e:
         logger.error(f"Auto-promotion check failed: {e}")
+
+    # Installs this run's bundle into models/ if it was just promoted (training only writes to OUT_DIR)
+    try:
+        from services.model_sync import VARIANT_MODELS, sync_production_models
+        variant = next(v for v, name in VARIANT_MODELS.items() if name == model_name)
+        report = sync_production_models(MODELS_DIR)[variant]
+        logger.info(f"Serving: {report['action']}" + (f" ({report['reason']})" if report.get("reason") else ""))
+    except Exception as e:
+        logger.warning(f"Could not sync served models: {e}")
 
 
 def main():

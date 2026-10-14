@@ -11,6 +11,7 @@ from app_state import S
 from config.logging_config import get_logger
 from services import PredictionService
 from services.ensemble_prediction_service import EnsemblePredictionService
+from services.tabular_models import load_deep_models
 from services.torch_prediction_service import PyTorchPredictionService
 
 logger = get_logger(__name__)
@@ -53,9 +54,12 @@ def _reload_models() -> None:
         challenger_noterms_model=loaded["challenger_noterms_model"],
     )
     new_ensemble = EnsemblePredictionService(loaded["passed_model"], loaded["challenger_model"])
+    deep = load_deep_models(S.model_loader.models_dir)
+    new_torch = PyTorchPredictionService(loaded["passed_model"], loaded["challenger_model"], deep) if deep else None
     for attr, model in loaded.items():
         setattr(S.app.state, attr, model)
-    S.prediction_service, S.ensemble_prediction_service = new_service, new_ensemble
+    S.app.state.torch_models = deep
+    S.prediction_service, S.ensemble_prediction_service, S.torch_prediction_service = new_service, new_ensemble, new_torch
     logger.info("Reloaded served models from the registry's Production versions")
 
 
@@ -107,20 +111,10 @@ async def load_model_middleware(request: Request, call_next):
                 logger.info(f"No {name} model, falling back to the shared model: {e}")
                 setattr(S.app.state, attr, None)
 
-    # Load PyTorch models if available
+    # Deep models (TabPFN, TabNet) installed from the registry (services/tabular_models.py)
     if not hasattr(S.app.state, 'torch_models'):
-        S.app.state.torch_models = {}
-        # Try to load common PyTorch model names
-        torch_model_names = ['tabular', 'ensemble', 'transformer', 'attention', 'bert']
-        for model_name in torch_model_names:
-            try:
-                torch_model = S.model_loader.load_model(model_name, model_type="torch")
-                if torch_model is not None:
-                    S.app.state.torch_models[model_name] = torch_model
-                    logger.info(f"Loaded PyTorch model: {model_name}")
-            except Exception as e:
-                logger.debug(f"PyTorch model '{model_name}' not available: {e}")
-    
+        S.app.state.torch_models = load_deep_models(S.model_loader.models_dir)
+
     # Initialize prediction service if models are loaded
     if (S.app.state.challenger_model is not None and 
         S.app.state.passed_model is not None and 

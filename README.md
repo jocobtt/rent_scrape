@@ -281,9 +281,9 @@ Honest scope notes:
 - **Tuning is shallow.** Every family got a small, comparable search (20 trials, or four context
   configurations for TabPFN), single seed, single validation scheme. TabNet's result shows the
   risk. These are demonstrations of the pipeline, not best-effort models.
-- **Heuristic recommendation endpoints** (`/ensemble/recommendations`, `/torch/recommendations`)
-  still use yen-scale cut-offs and treat `year_built` as a calendar year. They don't affect
-  predictions, but their output is not meaningful yet.
+- **Heuristic torch recommendations** (`/torch/recommendations`) still use yen-scale cut-offs
+  and treat `year_built` as a calendar year. They don't affect predictions, but their output
+  is not meaningful yet. (`/ensemble/recommendations` now recommends from held-out error.)
 - **Registry stages** are deprecated upstream in MLflow; moving to aliases is planned.
 - **Auth:** a shared API key guards admin routes. That is fine for a demo, not for
   multi-tenant use. Real deployments should use JWT or IAM.

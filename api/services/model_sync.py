@@ -32,6 +32,9 @@ VARIANT_MODELS = {
     "passed": "tokyo_passed_rent_model",
     "challenger-noterms": "tokyo_rent_lgbm_noterms",
     "passed-noterms": "tokyo_passed_rent_noterms",
+    # Deep models behind /torch/*: trained with deposit / key money, features file from FeaturePreprocessor
+    "tabpfn": "tokyo_rent_tabpfn",
+    "tabnet": "tokyo_rent_tabnet",
 }
 BUNDLE_DIR = "bundle"
 

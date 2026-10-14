@@ -25,7 +25,7 @@ async def predict_with_ensemble(request: Request, data: EnsemblePredictRequest):
     - weighted_average: Combines predictions using optimized weights
     - stacking: Uses meta-model to combine base model predictions  
     - voting: Simple average of all model predictions
-    - dynamic_weights: Adjusts weights based on input characteristics
+    - dynamic_weights: A separate blend for each predicted-rent band
     
     Args:
         data: EnsemblePredictRequest containing input data and ensemble method
@@ -260,7 +260,7 @@ async def get_available_ensemble_methods(request: Request):
             "weighted_average": "Optimally weighted combination of model predictions",
             "stacking": "Meta-model that learns how to combine base model predictions",
             "voting": "Simple average of all model predictions",
-            "dynamic_weights": "Adaptive weighting based on input characteristics"
+            "dynamic_weights": "A separate blend of the models for each predicted-rent band"
         }
         
         return methods

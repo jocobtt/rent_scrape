@@ -6,14 +6,11 @@ for combining multiple models and provides advanced prediction capabilities.
 """
 
 import logging
-import pandas as pd
 import numpy as np
-import joblib
-import os
 from typing import Dict, Any, List, Optional
 
 from .prediction_service import PredictionService
-from models.ensemble_model import EnsembleModel
+from models.ensemble_model import METHODS, EnsembleModel, ensemble_path
 
 logger = logging.getLogger(__name__)
 
@@ -35,76 +32,56 @@ class EnsemblePredictionService(PredictionService):
         self._load_ensemble_models()
     
     def _load_ensemble_models(self):
-        """Load pre-trained ensemble models from disk."""
-        models_dir = os.path.join(os.path.dirname(__file__), '..', 'models')
-        ensemble_methods = ['weighted_average', 'stacking', 'voting', 'dynamic_weights']
-        
-        for method in ensemble_methods:
-            ensemble_path = os.path.join(models_dir, f'ensemble_{method}_model.joblib')
-            if os.path.exists(ensemble_path):
-                try:
-                    ensemble = EnsembleModel(method=method)
-                    base_models = {
-                        'challenger': self.challenger_model,
-                        'passed': self.passed_model
-                    }
-                    ensemble.load(ensemble_path, base_models)
-                    self.ensemble_models[method] = ensemble
-                    logger.info(f"Loaded {method} ensemble model")
-                except Exception as e:
-                    logger.warning(f"Failed to load {method} ensemble: {e}")
-    
-    def predict_with_ensemble(self, input_data: Dict[str, float], method: str = 'weighted_average') -> Dict[str, Any]:
+        """Load the trained ensembles (models/ensemble_<method>_model.joblib) that exist."""
+        for method in METHODS:
+            path = ensemble_path(method)
+            if not path.exists():
+                continue
+            try:
+                self.ensemble_models[method] = EnsembleModel.load(path)
+                logger.info(f"Loaded {method} ensemble model")
+            except Exception as e:
+                logger.warning(f"Failed to load {method} ensemble: {e}")
+
+    def _base_predictions(self, input_data: Dict[str, float]) -> Dict[str, float]:
+        """What each base model predicts for this input (shared models: deposit / key money given)."""
+        return {
+            "challenger": self.predict_with_challenger_model(input_data)["prediction"],
+            "passed": self.predict_with_passed_model(input_data)["prediction"],
+        }
+
+    def predict_with_ensemble(self, input_data: Dict[str, float], method: str = 'weighted_average',
+                              base: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
         """
         Make prediction using ensemble model.
-        
+
         Args:
             input_data: Dictionary containing apartment features
             method: Ensemble method to use
-            
+            base: base-model predictions if the caller already has them
+
         Returns:
             Dict containing prediction and metadata
         """
         try:
             if method not in self.ensemble_models:
                 raise ValueError(f"Ensemble method '{method}' not available. Available methods: {list(self.ensemble_models.keys())}")
-            
+
             ensemble = self.ensemble_models[method]
-            
-            # Convert input to DataFrame (handle both formats)
-            if self._is_challenger_format(input_data):
-                # Direct feature array format for challenger
-                features_df = pd.DataFrame([{
-                    'rei_price': input_data['rei_price'],
-                    'shikikin': input_data['shikikin'],
-                    'maintenence_price': input_data['maintenence_price'],
-                    'year_built': input_data['year_built'],
-                    'floor': input_data['floor'],
-                    'eki_walk': input_data['eki_walk'],
-                    'sqr_m': input_data['sqr_m']
-                }])
-            else:
-                # Full feature format for passed model
-                features_df = pd.DataFrame([input_data])
-            
-            prediction = ensemble.predict(features_df)
-            
+            base = base or self._base_predictions(input_data)
+            prediction = ensemble.combine({name: np.array([value]) for name, value in base.items()})
+
             return {
-                "prediction": float(prediction[0]) if isinstance(prediction, np.ndarray) else float(prediction),
+                "prediction": float(prediction[0]),
                 "model_type": f"ensemble_{method}",
-                "ensemble_weights": ensemble.weights if hasattr(ensemble, 'weights') else None,
+                "ensemble_weights": ensemble.describe()["weights"],
                 "status": "success"
             }
-            
+
         except Exception as e:
             logger.error(f"Ensemble prediction error ({method}): {str(e)}")
             raise
-    
-    def _is_challenger_format(self, input_data: Dict[str, float]) -> bool:
-        """Check if input data is in challenger model format (7 features)."""
-        challenger_features = ['rei_price', 'shikikin', 'maintenence_price', 'year_built', 'floor', 'eki_walk', 'sqr_m']
-        return all(feature in input_data for feature in challenger_features) and len(input_data) == len(challenger_features)
-    
+
     def compare_all_predictions(self, input_data: Dict[str, float]) -> Dict[str, Any]:
         """
         Compare predictions from all available models including ensembles.
@@ -122,11 +99,13 @@ class EnsemblePredictionService(PredictionService):
             base_results = super().compare_predictions(input_data)
             results.update(base_results)
             
-            # Get ensemble predictions
+            # Get ensemble predictions (the base models are asked once, not once per method)
             ensemble_predictions = {}
+            base = {"challenger": base_results["predictions"]["challenger_model"],
+                    "passed": base_results["predictions"]["passed_model"]}
             for method in self.ensemble_models.keys():
                 try:
-                    ensemble_result = self.predict_with_ensemble(input_data, method)
+                    ensemble_result = self.predict_with_ensemble(input_data, method, base=base)
                     ensemble_predictions[f"ensemble_{method}"] = ensemble_result["prediction"]
                 except Exception as e:
                     logger.warning(f"Failed to get {method} ensemble prediction: {e}")
@@ -228,69 +207,58 @@ class EnsemblePredictionService(PredictionService):
     
     def get_model_recommendations(self, input_data: Dict[str, float]) -> Dict[str, Any]:
         """
-        Provide model recommendations based on input characteristics.
-        
+        Recommend a model from how each performed on buildings it was not fitted on.
+
         Args:
             input_data: Dictionary containing apartment features
-            
+
         Returns:
             Dict containing model recommendations and reasoning
         """
         try:
-            # Analyze input characteristics
-            rent_price = input_data.get('rei_price', 0)
-            apartment_size = input_data.get('sqr_m', 0)
-            year_built = input_data.get('year_built', 2000)
-            
+            confidence_analysis = self.get_prediction_confidence(input_data)
+            consensus = confidence_analysis["prediction_range"]["mean"]  # 万円
+            size = input_data.get('sqr_m', 0)
+            age = input_data.get('year_built', 0)  # years since construction
+
+            scored = sorted(
+                ((m.meta.get("eval_rmse"), name) for name, m in self.ensemble_models.items()
+                 if m.meta.get("eval_rmse") is not None),
+            )
             recommendations = []
-            
-            # Recommend based on property characteristics
-            if rent_price > 150000:  # High-end properties
+            if scored:
+                best_rmse, best = scored[0]
                 recommendations.append({
-                    "model": "ensemble_stacking",
-                    "reason": "Stacking ensemble performs well on high-value properties with complex patterns",
-                    "confidence": "high"
+                    "model": f"ensemble_{best}",
+                    "reason": f"Lowest held-out error of the ensembles (RMSE {best_rmse:.2f} 万円, "
+                              f"against the linear and LightGBM models it combines)",
+                    "confidence": "high" if confidence_analysis["confidence_level"] in ("very_high", "high") else "medium",
                 })
-            
-            if apartment_size > 60:  # Large apartments
+                recommendations += [
+                    {"model": f"ensemble_{name}", "reason": f"Held-out RMSE {rmse:.2f} 万円", "confidence": "medium"}
+                    for rmse, name in scored[1:]
+                ]
+            else:
                 recommendations.append({
                     "model": "challenger_model",
-                    "reason": "LightGBM handles large apartment pricing patterns effectively",
-                    "confidence": "medium"
+                    "reason": "No ensembles are trained yet; LightGBM is the strongest single model",
+                    "confidence": "medium",
                 })
-            
-            if year_built < 1990:  # Older properties
-                recommendations.append({
-                    "model": "ensemble_weighted_average",
-                    "reason": "Weighted ensemble balances linear and non-linear patterns for older properties",
-                    "confidence": "medium"
-                })
-            
-            # Default recommendation
-            if not recommendations:
-                recommendations.append({
-                    "model": "ensemble_weighted_average",
-                    "reason": "Weighted ensemble provides reliable predictions for typical properties",
-                    "confidence": "high"
-                })
-            
-            # Get confidence analysis
-            confidence_analysis = self.get_prediction_confidence(input_data)
-            
+
             return {
                 "recommended_models": recommendations,
                 "input_analysis": {
-                    "rent_category": "high" if rent_price > 150000 else "medium" if rent_price > 80000 else "low",
-                    "size_category": "large" if apartment_size > 60 else "medium" if apartment_size > 30 else "small",
-                    "age_category": "new" if year_built > 2010 else "medium" if year_built > 1990 else "old"
+                    "rent_category": "high" if consensus > 25 else "medium" if consensus > 12 else "low",
+                    "size_category": "large" if size > 60 else "medium" if size > 30 else "small",
+                    "age_category": "new" if age < 5 else "medium" if age < 25 else "old",
                 },
                 "confidence_analysis": confidence_analysis
             }
-            
+
         except Exception as e:
             logger.error(f"Error generating model recommendations: {str(e)}")
             raise
-    
+
     def batch_predict(self, input_data_list: List[Dict[str, float]], method: str = 'ensemble_weighted_average') -> List[Dict[str, Any]]:
         """
         Make batch predictions using specified method.
@@ -334,10 +302,7 @@ class EnsemblePredictionService(PredictionService):
             "ensemble_methods": list(self.ensemble_models.keys()),
             "total_methods": 2 + len(self.ensemble_models),
             "ensemble_details": {
-                method: {
-                    "weights": ensemble.weights if hasattr(ensemble, 'weights') else None,
-                    "method_type": ensemble.method
-                }
+                method: ensemble.describe()
                 for method, ensemble in self.ensemble_models.items()
             }
         }
