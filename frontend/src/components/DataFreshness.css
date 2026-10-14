@@ -1,0 +1,15 @@
+.data-freshness {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748b);
+}
+
+.data-freshness--warn {
+  display: inline-block;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+

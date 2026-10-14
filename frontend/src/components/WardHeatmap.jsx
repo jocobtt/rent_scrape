@@ -1,15 +1,22 @@
 import React, { useRef, useEffect } from 'react';
 import * as d3 from 'd3';
 import { getAverageRentByWard } from '../lib/dataUtils';
+import useResizeObserver from '../hooks/useResizeObserver';
 
 // One line of text per ward, so the rows are sized for it rather than squeezed into a fixed height
 const ROW_HEIGHT = 26;
 
-const WardHeatmap = ({ data, width = 700 }) => {
+// Narrower than this the ward labels and the bar no longer both fit
+const MIN_WIDTH = 280;
+
+const WardHeatmap = ({ data }) => {
   const svgRef = useRef(null);
+  // Drawn at the width its container has, redrawn when that changes (a fixed 700 px made phones scroll sideways)
+  const { resizeRef, dimensions } = useResizeObserver();
+  const width = dimensions.width ? Math.max(MIN_WIDTH, Math.floor(dimensions.width)) : 0;
 
   useEffect(() => {
-    if (!data || data.length === 0 || !svgRef.current) return;
+    if (!width || !data || data.length === 0 || !svgRef.current) return;
 
     // Clear previous chart
     d3.select(svgRef.current).selectAll('*').remove();
@@ -154,7 +161,11 @@ const WardHeatmap = ({ data, width = 700 }) => {
 
   }, [data, width]);
 
-  return <div ref={svgRef} style={{ overflow: 'auto' }}></div>;
+  return (
+    <div ref={resizeRef} style={{ overflow: 'auto' }}>
+      <div ref={svgRef} />
+    </div>
+  );
 };
 
 export default WardHeatmap;

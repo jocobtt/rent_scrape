@@ -25,6 +25,20 @@ const buildModelList = (compare) => {
   return rows.sort((a, b) => a.value - b.value);
 };
 
+const medianOf = (values) => {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+};
+
+// "+3.1万 vs median"; blank within 0.05万, where a sign would only be noise
+const vsMedian = (value, median) => {
+  const diff = value - median;
+  if (Math.abs(diff) < 0.05) return 'at the median';
+  return `${diff > 0 ? '+' : '−'}${Math.abs(diff).toFixed(1)}万 vs median`;
+};
+
 const STAT_CHIPS = (s) => [
   ['Mean', formatYen(s.mean)],
   ['Median', formatYen(s.median)],
@@ -37,10 +51,12 @@ const PredictionsCard = ({ compare, pending = [] }) => {
   const models = buildModelList(compare);
   const stats = compare.comprehensive_statistics;
   const vals = models.map((m) => m.value);
-  const minVal = vals.length ? Math.min(...vals) : 0;
-  const spread = vals.length ? Math.max(...vals) - minVal || 1 : 1;
-  // Bars are scaled to the spread, with a floor so the lowest one stays visible
-  const barWidth = (v) => Math.max(12, Math.round(12 + 88 * (v - minVal) / spread));
+  // Bars start at zero so their lengths are the real proportions; a marker shows the median and
+  // the text beside each value says how far from it the model is
+  const maxVal = vals.length ? Math.max(...vals) : 1;
+  const median = stats?.median ?? medianOf(vals);
+  const barWidth = (v) => Math.round((100 * v) / maxVal);
+  const medianLeft = barWidth(median);
 
   return (
     <div className="result-card">
@@ -56,10 +72,13 @@ const PredictionsCard = ({ compare, pending = [] }) => {
                   className="pred-row__bar"
                   style={{ width: `${barWidth(value)}%`, backgroundColor: meta.color }}
                 />
+                {models.length > 1 && <span className="pred-row__median" style={{ left: `${medianLeft}%` }} />}
               </div>
               <span className="pred-row__value">
                 {formatYen(value)}
-                <span className="pred-row__man">{formatMan(value)}</span>
+                <span className="pred-row__man">
+                  {formatMan(value)}{models.length > 1 && ` · ${vsMedian(value, median)}`}
+                </span>
               </span>
             </div>
           );
@@ -72,6 +91,7 @@ const PredictionsCard = ({ compare, pending = [] }) => {
           </div>
         ))}
       </div>
+      {models.length > 1 && <p className="pred-caption">Bars start at zero; the line marks the median of the models.</p>}
 
       {stats && (
         <div className="stats-strip">

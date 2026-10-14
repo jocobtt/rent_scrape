@@ -163,7 +163,7 @@ const TokyoMapHeatmap = ({ data, width = 800, height = 700 }) => {
 
     const legendAxis = d3.axisBottom(legendScale)
       .ticks(5)
-      .tickFormat(d => `¥${d.toFixed(1)}`);
+      .tickFormat(d => `${d.toFixed(1)}万`);
 
     // Legend gradient
     const defs = svg.append('defs');

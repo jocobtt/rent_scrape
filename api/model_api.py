@@ -136,6 +136,7 @@ app.add_middleware(
     allow_credentials = True,
     allow_methods = ["GET", "POST"],
     allow_headers = ["*"],
+    expose_headers = ["X-Dataset-Created"],  # the dashboard shows how old the scrape is
 )
 
 # The listings CSV is a few MB of repetitive text; everything else is tiny and skipped

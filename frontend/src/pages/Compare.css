@@ -219,6 +219,16 @@
   border-radius: 999px;
   height: 10px;
   overflow: hidden;
+  position: relative;
+}
+
+.pred-row__median {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--text-primary);
+  opacity: 0.7;
 }
 
 .pred-row__bar {
@@ -459,9 +469,19 @@
     grid-column: span 1;
   }
 
+  /* label and value share a line; the bar gets the full width underneath */
   .pred-row {
-    grid-template-columns: 130px 1fr auto;
-    gap: var(--spacing-sm);
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px var(--spacing-sm);
+  }
+
+  .pred-row__track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .pred-row__label {
+    white-space: normal;
   }
 
   .confidence-meta {
@@ -508,6 +528,15 @@
   .compare-listing__grid {
     grid-template-columns: 1fr;
   }
+
+  /* the form needs the width more than the padding */
+  .compare-form-card {
+    padding: var(--spacing-lg) var(--spacing-md);
+  }
+
+  .compare-listing {
+    padding: var(--spacing-sm) var(--spacing-md) 0;
+  }
 }
 
 /* The quick-pick row sits directly above the submit button until a place is chosen */
@@ -522,3 +551,5 @@
 }
 @keyframes pred-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .pred-row__bar--pending { animation: none; } }
+
+.pred-caption { margin: var(--spacing-sm) 0 0; font-size: 0.75rem; color: var(--text-tertiary); }

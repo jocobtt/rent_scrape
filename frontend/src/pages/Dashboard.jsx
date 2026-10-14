@@ -12,6 +12,7 @@ import RentByWardChart from '../components/RentByWardChart';
 import ApartmentTypeDistribution from '../components/ApartmentTypeDistribution';
 import { parseTokyoRentData } from '../lib/dataUtils';
 import { fetchListingsCsv } from '../lib/listings';
+import DataFreshness from '../components/DataFreshness';
 import './Dashboard.css';
 import '../styles/cta-button.css';
 
@@ -46,14 +47,16 @@ const filtersToParams = (filters) => {
 const Dashboard = () => {
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dataInfo, setDataInfo] = useState({ createdAt: null, isSample: false });
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState(() => parseFiltersFromParams(searchParams));
 
   useEffect(() => {
     fetchListingsCsv()
-      .then(({ csvText, source }) => {
+      .then(({ csvText, source, createdAt, isSample }) => {
         const processedData = parseTokyoRentData(csvText);
         setData(processedData);
+        setDataInfo({ createdAt, isSample });
         setIsLoading(false);
         trackEvent('dashboard_viewed', { total_listings: processedData.length, data_source: source });
       })
@@ -125,6 +128,7 @@ const Dashboard = () => {
         <p className="dashboard-subtitle">
           Interactive visualization of {data.length.toLocaleString()} rental listings across Tokyo
         </p>
+        <DataFreshness createdAt={dataInfo.createdAt} isSample={dataInfo.isSample} />
       </div>
 
       <StatsCards data={filteredData} />
