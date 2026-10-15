@@ -183,10 +183,21 @@ family below passed:
 | PyTorch MLP ensemble | 3.12 | 0.966 | 7.4% | Production |
 | LightGBM | 3.59 | 0.955 | 6.7% | Production |
 | Linear regression | 4.53 | 0.928 | 16.2% | Production |
-| TabPFN | 4.79 | 0.919 | 2.8% | Production (clears its 4.8 gate by 0.01) |
-| TabNet | 5.11 | 0.908 | 9.1% | Production |
+| TabPFN | 2.34 | 0.975 | 4.1% | Production (see note) |
+| TabNet | 3.03 | 0.958 | 9.3% | Production (see note) |
 
 The PyTorch MLP (3.50 / 0.957 / 8.9%) is registered but not promoted: the ensemble beats it.
+
+*Note:* the TabPFN and TabNet rows were retrained on 2026-10-13 on the 28,600-row scrape (26,037 after
+cleaning) with the shared feature encoding, so the API can serve them. The other rows come from the
+earlier 2026-10-08 snapshot, so the rows are not on one split. TabPFN's context is capped at 1,000
+rows: it runs the whole context through the network for every ensemble member on every prediction,
+which on CPU takes about 4 s per member at 1,000 rows and about 90 s for 8 members at 4,000 (its `fit_with_cache` mode, which avoids that, returned
+wrong predictions in tabpfn 6.0.5). Scores on the 4,000-row context were 2.84 / 0.963.
+Members are what cost time, not what buys accuracy: on the held-out buildings 1, 2, 4 and 8 members
+scored RMSE 2.15, 2.30, 2.48 and 2.35, so it is trained with 2 (`TABPFN_ESTIMATORS`), about 3 s per
+prediction. That version (v6) beat the 8-member one by 1.8%, under the 2% promotion rule, so it was
+promoted by hand; the thresholds were still checked.
 Given the split-to-split noise above, a 2% improvement over Production (the promotion rule) is
 well inside the noise for any single run. Treat promotion as a sanity check, not as evidence
 that one version is better.
@@ -281,9 +292,9 @@ Honest scope notes:
 - **Tuning is shallow.** Every family got a small, comparable search (20 trials, or four context
   configurations for TabPFN), single seed, single validation scheme. TabNet's result shows the
   risk. These are demonstrations of the pipeline, not best-effort models.
-- **Heuristic recommendation endpoints** (`/ensemble/recommendations`, `/torch/recommendations`)
-  still use yen-scale cut-offs and treat `year_built` as a calendar year. They don't affect
-  predictions, but their output is not meaningful yet.
+- **Heuristic torch recommendations** (`/torch/recommendations`) still use yen-scale cut-offs
+  and treat `year_built` as a calendar year. They don't affect predictions, but their output
+  is not meaningful yet. (`/ensemble/recommendations` now recommends from held-out error.)
 - **Registry stages** are deprecated upstream in MLflow; moving to aliases is planned.
 - **Auth:** a shared API key guards admin routes. That is fine for a demo, not for
   multi-tenant use. Real deployments should use JWT or IAM.
@@ -320,5 +331,15 @@ Roadmap:
 
 ## Frontend
 
-The D3.js / Vue front end lives in a separate repo:
-[jocobtt/rent_d3](https://github.com/jocobtt/rent_d3).
+The React / D3.js dashboard and rent predictor live in [`frontend/`](frontend/)
+(previously the separate `jocobtt/rent_d3` repo; its history was merged in).
+
+```bash
+cd frontend
+npm install
+npm run dev   # http://localhost:5173, proxies prediction calls to the API on :8000
+```
+
+The dashboard charts read the newest scrape from the API (`GET /data/listings`), so they
+update after each `scripts/scrape_dataset.py` run. Without a scrape (or API) it falls back to
+the small sample in `frontend/public/`.

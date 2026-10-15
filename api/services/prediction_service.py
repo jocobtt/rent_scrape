@@ -18,7 +18,7 @@ _MODELS_DIR = Path(__file__).parent.parent / "models"
 # JSON is available (e.g. first boot before any training run).
 _FALLBACK_FEATURES = [
     "sqr_m", "rei_price", "shikikin", "maintenence_price",
-    "year_built", "floor", "nearest_eki_walk", "contract_type",
+    "year_built", "floor", "nearest_eki_walk",
 ]
 
 
@@ -29,8 +29,12 @@ def _load_preprocessor(filename: str):
         logger.debug("Preprocessor file not found: %s (will use fallback features)", path)
         return None
     try:
+        from services.artifact_bundle import BundleMismatch, verify
         from services.feature_preprocessor import FeaturePreprocessor
+        verify(_MODELS_DIR, filename[:-len("-features.json")])
         return FeaturePreprocessor.load(path)
+    except BundleMismatch:
+        raise  # a model paired with the wrong geo state predicts wrongly without erroring
     except Exception as exc:
         logger.warning("Could not load preprocessor %s: %s", path, exc)
         return None
@@ -110,7 +114,6 @@ class PredictionService:
             "floor":             input_data.get("floor", 0),
             # Handle both API name (eki_walk) and training name (nearest_eki_walk)
             "nearest_eki_walk":  input_data.get("eki_walk", input_data.get("nearest_eki_walk", 0)),
-            "contract_type":     input_data.get("contract_type", 0),
         }
         return pd.DataFrame([row])
 

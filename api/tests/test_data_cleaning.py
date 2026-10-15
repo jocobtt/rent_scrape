@@ -86,3 +86,16 @@ class TestResolveDataset:
 ])
 def test_convert_money_to_man(text, expected):
     assert convert_money_to_man(text) == pytest.approx(expected)
+
+
+class TestLayouts:
+    def test_real_layouts_kept_and_mis_parsed_ones_dropped(self):
+        layouts = ["1K", "ワンルーム", "2LDK", "1SLDK", "3DK", "16K", "42LDK", "0K", "LDK", None]
+        out = dc.valid_layout_mask(pd.Series(layouts))
+        assert list(out) == [True, True, True, True, True, False, False, False, False, True]
+
+    def test_clean_listings_reports_dropped_layouts(self):
+        df = _frame(apartment_type=["1K", "1K", "16K", "2LDK", "42LDK"])
+        out, rep = dc.clean_listings(df)
+        assert rep["invalid_layout_dropped"] == 1  # "42LDK" row is also the 1000 m2 outlier, gone earlier
+        assert "16K" not in set(out["apartment_type"])

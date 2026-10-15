@@ -13,8 +13,10 @@ Features:
 - Performance metrics comparison
 """
 
+import hashlib
 import logging
 import random
+import re
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
@@ -26,6 +28,15 @@ import numpy as np
 from scipy import stats
 
 logger = logging.getLogger(__name__)
+
+# Experiment names become file names (<name>.json, <name>_<YYYYMMDD>.jsonl)
+_EXPERIMENT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+
+
+def stable_bucket(user_id: str) -> int:
+    """0-99 bucket for a user id, identical across processes and restarts. (`hash()` is salted per
+    process, so it would move users between arms whenever a worker restarts.)"""
+    return int(hashlib.sha256(str(user_id).encode("utf-8")).hexdigest(), 16) % 100
 
 
 class ExperimentStatus(Enum):
@@ -170,6 +181,18 @@ class ABTestingService:
 
         logger.info("ABTestingService initialized")
 
+    @staticmethod
+    def validate_config(config: ABTestConfig) -> None:
+        """Raise ValueError for a config that must not be stored."""
+        if not _EXPERIMENT_NAME.match(config.experiment_name):
+            raise ValueError("experiment_name must be 1-64 letters, digits, '_' or '-'")
+
+        if config.traffic_split < 0 or config.traffic_split > 1:
+            raise ValueError("traffic_split must be between 0 and 1")
+
+        if config.min_samples < 10:
+            raise ValueError("min_samples must be at least 10")
+
     def create_experiment(self, config: ABTestConfig) -> bool:
         """
         Create a new A/B test experiment
@@ -181,12 +204,7 @@ class ABTestingService:
             True if successful
         """
         try:
-            # Validate config
-            if config.traffic_split < 0 or config.traffic_split > 1:
-                raise ValueError("traffic_split must be between 0 and 1")
-
-            if config.min_samples < 10:
-                raise ValueError("min_samples must be at least 10")
+            self.validate_config(config)
 
             # Save config
             config_path = self.experiments_dir / f"{config.experiment_name}.json"
@@ -305,8 +323,7 @@ class ABTestingService:
         elif config.split_strategy == TrafficSplitStrategy.RANDOM_HASH:
             # Consistent assignment based on user_id
             if user_id:
-                hash_value = hash(user_id) % 100
-                if hash_value < (config.traffic_split * 100):
+                if stable_bucket(user_id) < (config.traffic_split * 100):
                     return "treatment"
             return "control"
 
@@ -384,8 +401,9 @@ class ABTestingService:
         """
         try:
             # Find all log files for this experiment
-            pattern = f"{experiment_name}_*.jsonl"
-            log_files = list(self.results_dir.glob(pattern))
+            # exact "<name>_<YYYYMMDD>.jsonl": a bare "<name>_*" would also match experiment "<name>_2"
+            own = re.compile(rf"^{re.escape(experiment_name)}_\d{{8}}\.jsonl$")
+            log_files = [f for f in self.results_dir.glob(f"{experiment_name}_*.jsonl") if own.match(f.name)]
 
             if not log_files:
                 return pd.DataFrame()
@@ -559,7 +577,7 @@ class ABTestingService:
         pooled_std = np.sqrt(
             (control_errors.std() ** 2 + treatment_errors.std() ** 2) / 2
         )
-        cohens_d = (control_errors.mean() - treatment_errors.mean()) / pooled_std
+        cohens_d = (control_errors.mean() - treatment_errors.mean()) / pooled_std if pooled_std > 0 else 0.0
 
         # Confidence intervals
         control_ci = stats.t.interval(
@@ -612,7 +630,7 @@ class ABTestingService:
                 "difference": float(control_errors.mean() - treatment_errors.mean()),
                 "percent_improvement": float(
                     ((control_errors.mean() - treatment_errors.mean()) / control_errors.mean()) * 100
-                ),
+                ) if control_errors.mean() > 0 else 0.0,
             },
         }
 
@@ -644,10 +662,9 @@ class ABTestingService:
         )
         is_meaningful = percent_improvement >= (min_effect_size * 100)
 
-        # Determine winner
-        treatment_better = (
-            treatment_metrics["mae"] < control_metrics["mae"]
-        )
+        # Determine winner from the same errors the significance test used (the two arms' own
+        # traffic), so the direction cannot contradict the reported test
+        treatment_better = statistical_tests["mean_errors"]["difference"] > 0
 
         if is_significant and is_meaningful:
             if treatment_better:

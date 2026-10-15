@@ -13,7 +13,7 @@ from sklearn.model_selection import GroupShuffleSplit, train_test_split
 
 logger = logging.getLogger(__name__)
 
-META_COLS = ["address", "building_id", "scraped_at"]  # identifiers, never features
+META_COLS = ["address", "building_id", "scraped_at", "nearest_station", "nearest_line", "n_stations"]  # identifiers, never features
 MIN_GROUPS = 10  # below this a group split is meaningless; fall back to random
 
 

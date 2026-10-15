@@ -317,8 +317,29 @@ class TestCleanData:
         if raw.empty:
             pytest.skip("HTML fixture didn't yield listings — update fixture")
         cleaned = scraper.clean_data(raw)
-        assert "contract_type" in cleaned.columns
+        assert "contract_type" not in cleaned.columns
+        assert cleaned["nearest_station"].iloc[0] == "代官山"
+        assert cleaned["nearest_line"].iloc[0] == "東急東横線"
+        assert (cleaned["n_stations"] == 2).all()
         assert cleaned["sqr_m"].dtype in [float, "float64", "float32"]
+
+
+class TestStationParsing:
+    def test_parse_station_standard(self):
+        from utils.scrape_data import parse_station
+        assert parse_station("東急東横線/代官山駅 歩6分") == {"line": "東急東横線", "station": "代官山", "walk_min": 6}
+
+    def test_parse_station_missing_or_odd(self):
+        from utils.scrape_data import parse_station
+        assert parse_station("-")["station"] == ""
+        assert parse_station("")["walk_min"] == 0
+        # no line separator
+        assert parse_station("渋谷駅 歩3分") == {"line": "", "station": "渋谷", "walk_min": 3}
+
+    def test_count_stations(self):
+        from utils.scrape_data import count_stations
+        assert count_stations("a/b駅 歩1分|c/d駅 歩2分|e/f駅 歩3分") == 3
+        assert count_stations("") == 1
 
 
 # ===========================================================================

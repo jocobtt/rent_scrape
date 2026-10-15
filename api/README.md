@@ -22,7 +22,7 @@ The primary goal of this API is to provide a user-friendly interface for accessi
 
 2. **Data Handling**: The data is scraped from the Suumo website, a popular apartment listing platform in Japan. We ensure that the data is cleaned and preprocessed to handle missing values and convert categorical variables into numerical formats.
 
-3. **Deployment**: The API is built using FastAPI, which allows for high performance and easy integration with machine learning models. We use BentoML for model serving, enabling us to deploy our models efficiently.
+3. **Deployment**: The API is built using FastAPI, which allows for high performance and easy integration with machine learning models.
 
 4. **Version Control**: We utilize MLflow for tracking experiments, logging metrics, and managing model versions. This helps in maintaining a clear history of model performance and facilitates easy rollback if needed.
 

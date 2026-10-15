@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from .drift_monitoring_service import DriftMonitoringService, load_reference_data
+from .drift_monitoring_service import MIN_DRIFT_SAMPLES, DriftMonitoringService, load_reference_data
 from .data_capture_service import DataCaptureService
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,13 @@ class MonitoringReportsManager:
 
         # Load reference data
         logger.info("Loading reference data for drift monitoring...")
-        self.reference_data = load_reference_data(reference_data_path)
+        try:
+            self.reference_data = load_reference_data(reference_data_path)
+        except FileNotFoundError as exc:
+            # Scraped data is not committed: a fresh checkout / CI / new deploy must still boot.
+            # Reports need a baseline, so they fail when generated, not at import time.
+            logger.warning("No reference data for drift monitoring (%s); drift reports are unavailable", exc)
+            self.reference_data = pd.DataFrame()
 
         # Initialize services
         self.drift_service = DriftMonitoringService(
@@ -177,6 +183,16 @@ class MonitoringReportsManager:
                 "message": "No prediction data available",
             }
 
+        if len(current_data) < MIN_DRIFT_SAMPLES:
+            return {
+                "status": "insufficient_data",
+                "drift_detected": False,
+                "message": f"{len(current_data)} predictions in the window; need at least {MIN_DRIFT_SAMPLES} "
+                           "for a drift decision (smaller windows produce false alarms)",
+                "current_rows": len(current_data),
+                "min_samples": MIN_DRIFT_SAMPLES,
+            }
+
         # Prepare data
         current_data = self._prepare_data_for_evidently(current_data)
 
@@ -191,6 +207,7 @@ class MonitoringReportsManager:
             current_data=current_data,
             save_html=True,
             save_json=False,
+            drift_share_threshold=drift_threshold,
         )
 
         result = {

@@ -18,6 +18,8 @@ import mlflow
 from mlflow.tracking import MlflowClient
 from mlflow.exceptions import MlflowException
 
+from services.auto_promotion_service import PROMOTION_THRESHOLDS
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,6 +32,15 @@ class SLACriteria:
     demotion_stage: str = "Staging"
 
 
+def sla_from_promotion(limits: Dict[str, float]) -> SLACriteria:
+    """SLA floor for a model: looser than its promotion gate (RMSE x1.25, R² -0.08, MAPE x1.5), so a
+    Production model is only demoted once it is clearly worse than what it had to clear to get there.
+    Everything is in the models' own units: RMSE in 万円 (rent is predicted in 万円)."""
+    return SLACriteria(max_rmse=round(limits["max_rmse"] * 1.25, 2),
+                       min_r2=round(limits["min_r2"] - 0.08, 2),
+                       max_mape=round(limits["max_mape"] * 1.5, 1))
+
+
 class ModelSLAService:
     """
     Monitors production models against SLA floors and demotes failing models.
@@ -40,14 +51,8 @@ class ModelSLAService:
         result = sla.check_model("tokyo_rent_lgbm")  # check a single model
     """
 
-    # SLA floors — intentionally ~15% looser than promotion thresholds
-    criteria: Dict[str, SLACriteria] = {
-        "tokyo_rent_lgbm":         SLACriteria(max_rmse=20_000, min_r2=0.82, max_mape=12.0),
-        "tokyo_passed_rent_model": SLACriteria(max_rmse=23_000, min_r2=0.78, max_mape=14.0),
-        "tokyo_rent_tabpfn":       SLACriteria(max_rmse=18_000, min_r2=0.85, max_mape=11.0),
-        "tokyo_rent_tabnet":       SLACriteria(max_rmse=19_000, min_r2=0.84, max_mape=11.5),
-        "tokyo_rent_torch":        SLACriteria(max_rmse=19_000, min_r2=0.85, max_mape=11.0),
-    }
+    # SLA floors, derived from the promotion gates (services/auto_promotion_service.py::PROMOTION_THRESHOLDS)
+    criteria: Dict[str, SLACriteria] = {name: sla_from_promotion(limits) for name, limits in PROMOTION_THRESHOLDS.items()}
 
     def __init__(self):
         mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
@@ -189,7 +194,7 @@ class ModelSLAService:
         mape = metrics.get("mape")
 
         if rmse is not None and rmse > criteria.max_rmse:
-            return False, f"RMSE {rmse:,.0f} exceeds SLA max {criteria.max_rmse:,.0f}"
+            return False, f"RMSE {rmse:.2f} exceeds SLA max {criteria.max_rmse:.2f}"
         if r2 is not None and r2 < criteria.min_r2:
             return False, f"R² {r2:.4f} below SLA min {criteria.min_r2:.4f}"
         if mape is not None and mape > criteria.max_mape:

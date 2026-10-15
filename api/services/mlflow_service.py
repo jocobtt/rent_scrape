@@ -201,6 +201,15 @@ class MLflowService:
             logger.debug(f"Could not load dataset lineage for run {run_id}: {e}")
             return None
 
+    @staticmethod
+    def _normalise_importance(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Importances as shares of the total (0-1). LightGBM logs raw split counts; clients (the web UI)
+        show them as percentages."""
+        total = sum(float(i.get("importance", 0) or 0) for i in items)
+        if total <= 0:
+            return items
+        return [{**i, "importance": float(i["importance"]) / total} for i in items]
+
     def _get_feature_importance(self, run_id: str) -> List[Dict[str, Any]]:
         """
         Get feature importance from MLflow artifacts.
@@ -219,7 +228,7 @@ class MLflowService:
             with open(local_path, 'r') as f:
                 feature_importance = json.load(f)
 
-            return feature_importance
+            return self._normalise_importance(feature_importance)
 
         except Exception as e:
             logger.debug(f"Could not load feature importance: {e}")

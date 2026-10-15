@@ -6,10 +6,16 @@ on:
   pull_request:
     branches: [master, main]
 
+# A newer push to the same branch / PR makes the running test job obsolete
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: api
@@ -19,12 +25,48 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: api/uv.lock
 
+      # --frozen: fail if uv.lock is out of date with pyproject.toml instead of silently re-resolving
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
 
+      # No scraped data, MLflow server or network in CI: the tests use the committed models in
+      # api/models/ (their SHA-256 stamps are verified on load, so a model committed without its
+      # features file fails here) and the synthetic fixtures.
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short -m "not integration"
         env:
           MLFLOW_TRACKING_URI: http://localhost:5001
           ENVIRONMENT: test
+          GEO_LIVE_GEOCODE: "0"
+
+  frontend:
+    name: Frontend lint and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `npm install`, not `npm ci`: the lockfile lacks some platform-specific rollup
+      # packages, so `npm ci` rejects it on Linux (same command as vercel.json)
+      - name: Install dependencies
+        run: npm install --include=optional --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

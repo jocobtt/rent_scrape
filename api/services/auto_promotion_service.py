@@ -348,7 +348,13 @@ class AutoPromotionService:
         Returns:
             (is_better, reason)
         """
-        # Primary metric: RMSE (lower is better)
+        # Several held-out splits beat one: when both runs carry multi-seed metrics, decide on those
+        from services.multiseed_gate import compare as compare_multiseed
+        multiseed = compare_multiseed(candidate_metrics, production_metrics, criteria.min_improvement_percent)
+        if multiseed is not None:
+            return multiseed
+
+        # Single-split fallback (a run without multi-seed metrics): RMSE (lower is better)
         candidate_rmse = candidate_metrics.get("rmse", float("inf"))
         production_rmse = production_metrics.get("rmse", float("inf"))
 

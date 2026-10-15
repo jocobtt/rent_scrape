@@ -11,10 +11,14 @@ After retraining, automatically checks if new models should be promoted.
 """
 
 import logging
+import subprocess
+import sys
 import threading
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+
+import pandas as pd
 
 from .monitoring_reports import MonitoringReportsManager
 from .auto_promotion_service import AutoPromotionService
@@ -23,6 +27,19 @@ from .training_service import TrainingService
 logger = logging.getLogger(__name__)
 
 API_DIR = str(Path(__file__).resolve().parent.parent)
+
+# Training scripts per model family. The no-terms variants serve every request that omits deposit /
+# key money, so they have to be retrained with their family or they would go stale.
+RETRAIN_JOBS = {
+    "challenger": [("challenger", ["models/challenger_model.py"]),
+                   ("challenger-noterms", ["models/challenger_model.py", "--no-terms"])],
+    "passed": [("passed", ["models/reg_model.py"]),
+               ("passed-noterms", ["models/reg_model.py", "--no-terms"])],
+}
+RETRAIN_TIMEOUT_S = 1800  # tuned LightGBM takes several minutes
+
+# Logged `model_type` -> registered model whose Production run holds the training-time metrics
+BASELINE_MODELS = {"passed": "tokyo_passed_rent_model", "challenger": "tokyo_rent_lgbm"}
 
 
 class AutoRetrainService:
@@ -105,17 +122,21 @@ class AutoRetrainService:
                 f"Performance degraded: {performance_check['performance_degraded']}"
             )
 
-            if not dry_run:
-                # Trigger retraining
-                retrain_result = self._retrain_models()
-                results["retraining_triggered"] = True
+            blocked = [m for m in RETRAIN_JOBS if not self.check_if_retrain_allowed(m)]
+            if len(blocked) == len(RETRAIN_JOBS):
+                results["message"] = (f"Retraining warranted but skipped: every model was retrained within "
+                                      f"the last {self.min_days_between_retrains} day(s)")
+            elif not dry_run:
+                # Trigger retraining (families inside their cooldown are left alone)
+                retrain_result = self._retrain_models([m for m in RETRAIN_JOBS if m not in blocked])
+                results["retraining_triggered"] = retrain_result.get("status") != "skipped"
                 results["models_retrained"] = retrain_result["models_retrained"]
+                results["errors"] = retrain_result.get("errors", [])
 
                 # Check if new models should be promoted
-                promotion_result = self.auto_promotion.check_and_promote_new_models(
-                    dry_run=False
-                )
-                results["models_promoted"] = promotion_result["models_promoted"]
+                if retrain_result["models_retrained"]:
+                    promotion_result = self.auto_promotion.check_and_promote_new_models(dry_run=False)
+                    results["models_promoted"] = promotion_result["models_promoted"]
             else:
                 results["retraining_triggered"] = True
                 results["message"] = "Dry run - would have retrained models"
@@ -175,11 +196,11 @@ class AutoRetrainService:
             # Filter to recent predictions
             cutoff_date = datetime.now() - timedelta(days=days_back)
             predictions_with_actuals["timestamp"] = pd.to_datetime(
-                predictions_with_actuals["timestamp"]
+                predictions_with_actuals["timestamp"], format="ISO8601"
             )
             recent = predictions_with_actuals[
                 predictions_with_actuals["timestamp"] >= cutoff_date
-            ]
+            ].copy()
 
             if recent.empty:
                 return {
@@ -188,39 +209,35 @@ class AutoRetrainService:
                     "message": "No recent predictions with actuals",
                 }
 
-            # Calculate recent MAE
-            import pandas as pd
+            recent["error"] = (recent["actual_value"] - recent["prediction"]).abs()
+            recent_mae = float(recent["error"].mean())
 
-            recent["error"] = abs(recent["actual_value"] - recent["prediction"])
-            recent_mae = recent["error"].mean()
-
-            # Compare with expected performance (from training)
-            # For simplicity, use hardcoded thresholds
-            # In production, you'd compare with historical performance
-            expected_mae = {
-                "passed": 19000,
-                "challenger": 17500,
-            }
-
+            # Compare each model with the MAE it had when it was trained (万円, same unit as the
+            # logged predictions); models without a Production baseline are not judged.
+            baselines = self._baseline_mae()
             performance_degraded = False
-            for model_type, threshold in expected_mae.items():
+            per_model = {}
+            for model_type, baseline in baselines.items():
                 model_data = recent[recent["model_type"] == model_type]
-                if not model_data.empty:
-                    model_mae = model_data["error"].mean()
-                    degradation = (model_mae - threshold) / threshold
-
-                    if degradation > self.performance_degradation_threshold:
-                        performance_degraded = True
-                        logger.warning(
-                            f"{model_type} model degraded: "
-                            f"MAE {model_mae:.2f} vs expected {threshold:.2f} "
-                            f"({degradation:.1%} degradation)"
-                        )
+                if model_data.empty or not baseline > 0:
+                    continue
+                model_mae = float(model_data["error"].mean())
+                degradation = (model_mae - baseline) / baseline
+                degraded = degradation > self.performance_degradation_threshold
+                per_model[model_type] = {"mae": model_mae, "baseline_mae": baseline,
+                                         "degradation": degradation, "degraded": degraded}
+                if degraded:
+                    performance_degraded = True
+                    logger.warning(
+                        f"{model_type} model degraded: MAE {model_mae:.2f} vs training {baseline:.2f} "
+                        f"({degradation:.1%} degradation)"
+                    )
 
             return {
                 "performance_degraded": performance_degraded,
                 "recent_mae": recent_mae,
                 "samples_evaluated": len(recent),
+                "models": per_model,
                 "requires_retraining": performance_degraded,
             }
 
@@ -232,7 +249,21 @@ class AutoRetrainService:
                 "error": str(e),
             }
 
-    def _retrain_models(self) -> Dict[str, Any]:
+    def _baseline_mae(self) -> Dict[str, float]:
+        """Training-time MAE (万円) of each Production model, from its MLflow run."""
+        out = {}
+        for model_type, registered in BASELINE_MODELS.items():
+            try:
+                versions = self.auto_promotion.client.get_latest_versions(registered, stages=["Production"])
+                if versions:
+                    mae = self.auto_promotion._get_model_metrics(versions[0].run_id).get("mae")
+                    if mae is not None:
+                        out[model_type] = float(mae)
+            except Exception as e:
+                logger.warning("No baseline MAE for %s: %s", model_type, e)
+        return out
+
+    def _retrain_models(self, families: Optional[list] = None) -> Dict[str, Any]:
         """Trigger model retraining. Skips gracefully if a retrain is already running."""
         if not AutoRetrainService._retrain_lock.acquire(blocking=False):
             logger.warning("Retrain already in progress — skipping concurrent request")
@@ -245,12 +276,12 @@ class AutoRetrainService:
             }
 
         try:
-            return self._run_retraining()
+            return self._run_retraining(families)
         finally:
             AutoRetrainService._retrain_lock.release()
 
-    def _run_retraining(self) -> Dict[str, Any]:
-        """Internal: execute the actual retrain subprocesses (called only when lock is held)."""
+    def _run_retraining(self, families: Optional[list] = None) -> Dict[str, Any]:
+        """Internal: execute the retrain subprocesses (called only when the lock is held)."""
         logger.info("Starting model retraining...")
 
         results = {
@@ -259,59 +290,29 @@ class AutoRetrainService:
             "errors": [],
         }
 
-        # Retrain challenger model
-        try:
-            logger.info("Retraining challenger model...")
-            # Note: This assumes you have a retrain endpoint or method
-            # You may need to adapt this based on your setup
-            import subprocess
-
-            result = subprocess.run(
-                ["python", "models/challenger_model.py"],
-                cwd=API_DIR,
-                capture_output=True,
-                text=True,
-                timeout=600,  # 10 minute timeout
-            )
-
-            if result.returncode == 0:
-                results["models_retrained"].append("challenger")
-                logger.info("✅ Challenger model retrained successfully")
-                self.last_retrain["challenger"] = datetime.now()
-            else:
-                error_msg = f"Challenger retrain failed: {result.stderr}"
-                results["errors"].append(error_msg)
-                logger.error(error_msg)
-
-        except Exception as e:
-            error_msg = f"Error retraining challenger: {e}"
-            results["errors"].append(error_msg)
-            logger.error(error_msg)
-
-        # Retrain passed model
-        try:
-            logger.info("Retraining passed model...")
-            result = subprocess.run(
-                ["python", "models/reg_model.py"],
-                cwd=API_DIR,
-                capture_output=True,
-                text=True,
-                timeout=600,
-            )
-
-            if result.returncode == 0:
-                results["models_retrained"].append("passed")
-                logger.info("✅ Passed model retrained successfully")
-                self.last_retrain["passed"] = datetime.now()
-            else:
-                error_msg = f"Passed retrain failed: {result.stderr}"
-                results["errors"].append(error_msg)
-                logger.error(error_msg)
-
-        except Exception as e:
-            error_msg = f"Error retraining passed: {e}"
-            results["errors"].append(error_msg)
-            logger.error(error_msg)
+        for family in (families or list(RETRAIN_JOBS)):
+            for name, argv in RETRAIN_JOBS[family]:
+                try:
+                    logger.info("Retraining %s...", name)
+                    result = subprocess.run(
+                        [sys.executable, *argv],
+                        cwd=API_DIR,
+                        capture_output=True,
+                        text=True,
+                        timeout=RETRAIN_TIMEOUT_S,
+                    )
+                    if result.returncode == 0:
+                        results["models_retrained"].append(name)
+                        self.last_retrain[family] = datetime.now()
+                        logger.info("Retrained %s", name)
+                    else:
+                        error_msg = f"{name} retrain failed: {result.stderr[-2000:]}"
+                        results["errors"].append(error_msg)
+                        logger.error(error_msg)
+                except Exception as e:
+                    error_msg = f"Error retraining {name}: {e}"
+                    results["errors"].append(error_msg)
+                    logger.error(error_msg)
 
         return results
 
@@ -346,7 +347,10 @@ class AutoRetrainService:
         """
         logger.info(f"Force retraining: {model_name or 'all models'}")
 
-        results = self._retrain_models()
+        if model_name is not None and model_name not in RETRAIN_JOBS:
+            return {"models_retrained": [], "errors": [f"Unknown model '{model_name}'; choose from {sorted(RETRAIN_JOBS)}"]}
+
+        results = self._retrain_models([model_name] if model_name else None)
 
         # Auto-promote if successful
         if results["models_retrained"]:

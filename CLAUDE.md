@@ -126,7 +126,13 @@ Data Scraping (Suumo) → Model Training → MLflow Registry
 
 ```
 api/
-├── model_api.py              # Main FastAPI app (40+ endpoints)
+├── model_api.py              # App assembly: middleware, services, includes the routers (entrypoint `model_api:app`)
+├── routers/                  # Endpoints by area: health, predictions, training, models (promotion/serving/SLA),
+│                             #   ensemble, monitoring, ab_testing, torch_routes, explain, lineage
+├── schemas.py                # Request models shared by the routers (InputData, ...)
+├── deps.py                   # Rate limiter, admin-key guard, rate-limit tiers
+├── app_state.py              # `S`: the service singletons routers read at call time (tests patch S.<service>)
+├── model_runtime.py          # Loads served models, registry sync and reload, the model-loading middleware
 ├── scheduled_tasks.py        # Automated tasks (promotion, drift, monitoring)
 ├── models/                   # Model training scripts & artifacts
 │   ├── challenger_model.py   # LightGBM training + auto-promotion
@@ -164,18 +170,37 @@ tf/                          # Terraform (GCP deployment)
 - `rei_price`: Key money (礼金) in 万円 (10,000 yen units). **Optional**; omit if unknown
 - `shikikin`: Security deposit (敷金) in 万円. **Optional**; omit if unknown (LightGBM sees NaN, linear gets the training median; ensemble/torch/explain routes still require both and return 422)
 - `maintenence_price`: Monthly maintenance fee in 万円
+- `address`: **Optional.** Street address to the block (e.g. `東京都渋谷区猿楽町１`). The `-noterms` models (served when both `rei_price` and `shikikin` are omitted) use it to look at nearby buildings' rents: spatial-lag features from `services/geo_features.py`, geocoded with the GSI API (unseen addresses fall back to a live lookup, then the town/ward centroid; `GEO_LIVE_GEOCODE=0` disables the live call). Without an address those features are NaN
+- `nearest_station` / `nearest_line`: **Optional.** Station name (without 駅) and its line; the `-noterms` models turn them into target encodings (`te_station`, `te_line`). Independent of `address`: either, both or neither may be sent
 - `year_built`: Years since construction
 - `floor`: Floor number
 - `eki_walk`: Walking time to nearest station (minutes)
 
 **Output:** Predicted monthly rent in 万円
 
+**Geo features (no-terms models only):** `python models/challenger_model.py --no-terms` and `python models/reg_model.py --no-terms` add `geo_*` / `te_town` columns (disable with `--no-geo`) and write `models/<variant>-geo.json` next to `<variant>-features.json`; `FeaturePreprocessor.load` picks it up. It holds per-building rent aggregates from the training set, so it is derived from scraped data and is not committed. Geocoded addresses are cached in `api/geo_cache/` (`scripts/geocode_addresses.py`). On held-out buildings the address + station features cut no-terms RMSE roughly 8% (4.78 → 4.39 on the 26k-row dataset, better on 5/5 splits); bandwidth, neighbour counts and shrinkage were tuned and sit on a flat optimum (`scripts/geo_features_experiment.py --set features|tuning`). With deposit/key money present they do not help, so the shared models don't use them.
+
+**Per-m² target and residual lag (LightGBM):** `models/challenger_model.py` fits rent per m² and multiplies back by `sqr_m` (`services/per_sqm_model.py::PerSqmRegressor`; `predict` still returns rent; `PER_SQM=0` reverts). The no-terms variant also smooths the out-of-fold residual of a location-free structural model instead of raw rent per m², and drops the two density columns. On held-out buildings that took no-terms RMSE from 4.39 to about 3.97. The shared model stays on the rent target: over 15 seeds the per-m² gain with terms was only about 0.3 RMSE and not uniform, so it didn't clear the promotion gate (`scripts/per_sqm_shared_check.py`).
+
+**Registry-driven serving (`services/model_sync.py`):** `models/` is a cache of the registry's Production versions. Training writes its files to `models/staging/` (never over the served ones) and logs them to its MLflow run under `bundle/`; after auto-promotion it calls `sync_production_models`, which installs the Production run's bundle into `models/` if it differs from the run id stamped in `<variant>-features.json`. The API re-checks every `MODEL_SYNC_INTERVAL_S` (default 300 s) and immediately after `/models/.../promote`, `/rollback` and `/models/check-promotion`; `MODEL_SYNC=0` serves whatever is on disk. Registry unreachable, no Production version (e.g. after an SLA demotion), or a Production run without a bundle: the files on disk keep being served. `GET /models/serving` shows serving run vs Production run per variant. For runs trained before bundles existed: `scripts/attach_bundle.py <variant>` logs the files on disk to the registered version they actually are (checked by prediction equality).
+
+**Ensembles (`models/ensemble_model.py`):** an ensemble combines the shared LightGBM's and linear model's *predictions* (`weighted_average`, `stacking`, `voting`, and `dynamic_weights`, a blend per predicted-rent band); serving asks each base model through `PredictionService` and calls `EnsembleModel.combine`. `cd api && uv run python models/ensemble_model.py` fits them on grouped out-of-fold predictions of fresh clones of the served models (seconds) and writes `models/ensemble_<method>_model.joblib`, which are committed (under 1 kB) and loaded by `EnsemblePredictionService`. Each is scored on buildings its weights were not fitted on (`eval_rmse` in the file, shown by `/ensemble/methods` and used by `/ensemble/recommendations`). Don't fit them on the served models' own held-out split: it changes whenever data cleaning does. Rerun after the base models change; the files record the base runs they were fitted against.
+
+**Deep models (`services/tabular_models.py`):** TabPFN and TabNet are served like the others: `python models/tabular_pretrained_model.py [--model tabpfn|tabnet]` trains with the shared `FeaturePreprocessor` encoding, writes `tabpfn-` / `tabnet-{model.joblib,features.json}` to `models/staging/`, logs them to the run under `bundle/` and, after the promotion check, `sync_production_models` installs them into `models/`. They sit behind `/torch/*` under their registered names and need deposit and key money. The files are large (TabPFN ~90 MB) and not committed. The custom PyTorch net (`tokyo_rent_torch`) is registered but has no serving path yet.
+
+**Local MLflow:** the training runs and registry used in development live in `sqlite:///mlflow_train.db` (`MLFLOW_TRACKING_URI=sqlite:///mlflow_train.db`), not the docker server at :5001 (whose artifact root, `/mlflow`, is not writable from the host). Training and the API must point at the same store.
+
+**Promotion evidence (`services/multiseed_gate.py`):** training also scores the final configuration on 5 grouped splits and logs `rmse_multiseed` (+ std, per-seed `rmse_seed_N`). When both candidate and Production have them, promotion needs a ≥2% lower mean RMSE, a win on ≥60% of seeds and no worse R²; otherwise it falls back to the single split. `scripts/backfill_multiseed.py <registered model> [--version N]` adds them to an older run.
+
+**Labels from re-scrapes (`services/fresh_listings.py`, `scripts/score_fresh_listings.py`):** nobody reports actual rents to the API, so each re-scrape is the ground truth. The script finds listings in a newer scrape whose unit (address, floor, size, layout, type, age) was not in the training scrape (recorded as `dataset` in the bundle stamp), runs them through the real `PredictionService` and reports RMSE / MAE / MAPE / R² per model and variant, with and without deposit / key money. It refuses to score the training dataset. `--log` also writes the rows with their actual rents into the prediction log (`source=rescrape`), which is what the auto-retrain performance check reads. Run it after each re-scrape, before retraining.
+
+**Model / feature / geo-state bundle:** each variant is `<variant>-model.joblib` + `-features.json` + (no-terms) `-geo.json`. Training stamps the model and geo SHA-256 into the features file (`services/artifact_bundle.py`); the API refuses to load a variant whose model or geo file doesn't match (`BUNDLE_CHECK=0` skips), and warns if the geo file is absent (the geo file isn't committed, so address / station features are NaN until it is restored or the variant retrained). `scripts/stamp_bundles.py` adopts existing files.
+
 ## MLflow Integration Details
 
 **Tracking URI:**
 - Docker: `http://mlflow:5000` (internal network)
 - Local: `http://localhost:5001` (external access)
-- Legacy code may reference `file://s3_path` (needs updating)
 
 **What Gets Logged (Both Models):**
 - Metrics: RMSE, MAE, R², MAPE, MSE
@@ -223,6 +248,12 @@ Calibrated on held-out buildings (grouped split); every candidate must also beat
 - `GET /monitoring/drift-summary` - Get drift detection summary
 - `POST /retrain/check-and-execute` - Check drift and retrain if needed
 - `POST /retrain/force` - Force immediate retraining
+
+### Dashboard data
+- `GET /data/listings` - CSV of the newest raw scrape (`dataset_versions/*/manifest.json` with `kind: scrape`) in the frontend dashboard's columns (`services/listings_export.py`); ETag = dataset hash, gzip-compressed. The dashboard falls back to `frontend/public/tokyo_model.csv` when the API has no scrape
+
+- `GET /data/market` - Medians per ward, layout and station from the same newest scrape (`services/market_summary.py`, cells under 5 listings omitted; rents in 万円). The Predict Rent page's guided flow uses it for starting values and the "vs typical" comparison
+- `POST /predict` and `/challenger_predict` accept `?log=false` to skip the drift-monitoring log; the guided form's live estimates use it so slider-dragging doesn't enter the logged data
 
 ### MLflow Metadata
 - `GET /model/metadata?model_name=tokyo_rent_lgbm` - Get model metadata
@@ -315,6 +346,10 @@ MLFLOW_TRACKING_URI=http://localhost:5001
 - Random: Random assignment per request → Use for anonymous users
 - Shadow mode: Both models predict, only control returned → Safe testing
 
+**SLA demotion (`services/sla_service.py`):** floors are derived from `PROMOTION_THRESHOLDS` (RMSE x1.25, R² -0.08, MAPE x1.5), in 万円 like the logged metrics. A Production model breaching one is demoted to Staging.
+
+**Drift (`services/drift_monitoring_service.py`):** Drift is only decided on windows of at least `DRIFT_MIN_SAMPLES` (default 200) rows: with fewer, Evidently's fixed 0.1 threshold flags noise (88% false alarms at 60 rows, 4% at 200, 0% at 400 on data from the reference distribution), and `run_drift_detection` returns `insufficient_data`. Evidently's `ValueDrift` returns a distance per column and flags drift when it exceeds the method's threshold (0.1 by default). Columns that are entirely empty (e.g. every logged request omitted deposit / key money) are skipped; optional deposit / key money gaps are not a data-quality failure. Auto-retrain compares each model's recent MAE with the MAE of its Production run in MLflow, retrains the no-terms variants with their family, and honours `min_days_between_retrains`.
+
 **Drift Detection Triggers:**
 - Data drift: Distribution shifts in input features (statistical tests)
 - Prediction drift: Model output distribution changes
@@ -330,7 +365,7 @@ MLFLOW_TRACKING_URI=http://localhost:5001
 - All predictions logged to `prediction_logs/predictions_YYYY-MM-DD.csv`
 - Buffered writes (default: 100 predictions before flush)
 - Used for drift monitoring and model performance tracking
-- Ground truth can be added later via `/monitoring/update-ground-truth`
+- Every logged prediction has a `prediction_id` (also returned by `/predict` and `/challenger_predict`) and the serving `variant`. Ground truth is added with `POST /monitoring/ground-truth` (admin; `{"labels": [{"prediction_id", "actual_value"}]}`), which rewrites only the log file holding the prediction
 
 ## Documentation References
 

@@ -6,6 +6,7 @@ model performance analysis over time.
 """
 
 import logging
+import uuid
 from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -74,9 +75,11 @@ class DataCaptureService:
         prediction: float,
         actual_value: Optional[float] = None,
         dataset_version: Optional[str] = None,
-    ) -> None:
+        variant: Optional[str] = None,
+        source: str = "api",
+    ) -> str:
         """
-        Log a single prediction
+        Log a single prediction and return its `prediction_id` (what a later actual value refers to)
 
         Args:
             model_type: Type of model used (passed, challenger, etc.)
@@ -86,10 +89,16 @@ class DataCaptureService:
             dataset_version: Short SHA-256 hash (12 chars) of the training
                              dataset used to train the serving model. Enables
                              drift analysis segmented by training data version.
+            variant: "shared" or "no_terms": which model variant served the request
+            source: "api" for live requests, "rescrape" for back-tested listings (scripts/score_fresh_listings.py)
         """
+        prediction_id = uuid.uuid4().hex
         log_entry = {
+            "prediction_id": prediction_id,
             "timestamp": datetime.now().isoformat(),
             "model_type": model_type,
+            "variant": variant,
+            "source": source,
             "dataset_version": dataset_version,
             "sqr_m": input_features.get("sqr_m"),
             "rei_price": input_features.get("rei_price"),
@@ -107,6 +116,7 @@ class DataCaptureService:
         # Auto-flush if buffer is full
         if self.auto_flush and len(self._buffer) >= self.buffer_size:
             self.flush()
+        return prediction_id
 
     def flush(self) -> int:
         """
@@ -175,7 +185,7 @@ class DataCaptureService:
             return df
 
         # Convert timestamp to datetime
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], format="ISO8601")  # isoformat() drops a zero microsecond
 
         # Apply filters
         if model_type:
@@ -219,52 +229,41 @@ class DataCaptureService:
 
     def update_actual_value(
         self,
-        timestamp: str,
+        identifier: str,
         actual_value: float,
     ) -> bool:
         """
-        Update a prediction log with the actual value
+        Record the actual value for one logged prediction.
 
         Args:
-            timestamp: Timestamp of the prediction to update
+            identifier: the `prediction_id` returned when it was logged (or, for logs written before ids
+                        existed, its exact `timestamp` string)
             actual_value: Actual target value
 
         Returns:
-            True if update successful, False otherwise
+            True if the prediction was found and updated. Only the log file holding it is rewritten, with
+            every other row intact.
         """
         try:
-            # Flush buffer first
             if self._buffer:
                 self.flush()
-
-            # Load all logs
-            df = self._load_all_logs()
-
-            if df.empty:
-                logger.warning("No prediction logs found")
-                return False
-
-            # Find the prediction by timestamp
-            mask = df["timestamp"] == timestamp
-
-            if not mask.any():
-                logger.warning(f"No prediction found with timestamp {timestamp}")
-                return False
-
-            # Update actual value
-            df.loc[mask, "actual_value"] = actual_value
-
-            # Save back to file
-            # Determine which file the prediction belongs to
-            log_file = self._find_log_file_for_timestamp(timestamp)
-            if log_file:
-                df_file = df[df["timestamp"] == timestamp]
-                df_file.to_csv(log_file, index=False)
-                logger.info(f"Updated actual value for prediction at {timestamp}")
+            for log_file in sorted(self.storage_dir.glob("predictions_*.csv")):
+                df = pd.read_csv(log_file)
+                mask = pd.Series(False, index=df.index)
+                if "prediction_id" in df.columns:
+                    mask |= df["prediction_id"] == identifier
+                if "timestamp" in df.columns:
+                    mask |= df["timestamp"] == identifier
+                if not mask.any():
+                    continue
+                df.loc[mask, "actual_value"] = actual_value
+                tmp = log_file.with_suffix(".csv.tmp")
+                df.to_csv(tmp, index=False)
+                tmp.replace(log_file)  # never leave a half-written log
+                logger.info(f"Updated actual value for prediction {identifier}")
                 return True
-
+            logger.warning(f"No prediction found for {identifier}")
             return False
-
         except Exception as e:
             logger.error(f"Error updating actual value: {e}")
             return False

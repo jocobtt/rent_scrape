@@ -26,7 +26,15 @@ NO_TERMS = os.getenv("NO_TERMS") == "1" or "--no-terms" in sys.argv
 VARIANT = "passed-noterms" if NO_TERMS else "passed"
 REGISTERED_NAME = "tokyo_passed_rent_noterms" if NO_TERMS else "tokyo_passed_rent_model"
 
-def load_data(dataset=None):
+# Training writes here, not over the files the API is serving; see challenger_model.py
+OUT_DIR = os.getenv("MODEL_OUT_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "staging"))
+os.makedirs(OUT_DIR, exist_ok=True)
+
+# Spatial-lag rent features for the no-terms variant (see challenger_model.py / services/geo_features.py)
+USE_GEO = NO_TERMS and os.getenv("GEO_FEATURES", "1") != "0" and "--no-geo" not in sys.argv
+
+
+def load_data(dataset=None, seed=42, save=True):
     import re
     import sys as _sys
     _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -41,14 +49,23 @@ def load_data(dataset=None):
 
     preprocessor = FeaturePreprocessor()
     encoded, _ = preprocessor.fit_transform(df)
-    preprocessor.save(os.path.join(os.path.dirname(__file__), f"{VARIANT}-features.json"))
 
     X = encoded.drop('rent_price', axis=1)
     y = encoded['rent_price']
     # Hold out whole buildings so near-duplicate units can't leak into the test set
     groups = group_labels(df)
-    X_train, X_test, y_train, y_test, _ = grouped_train_test_split(X, y, groups, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test, _ = grouped_train_test_split(X, y, groups, test_size=0.2, random_state=seed)
     df_for_lineage = attach_groups(encoded.copy(), groups)
+    if USE_GEO and groups is not None:
+        from services.geo_features import fit_geo_features
+        geo, f_tr, f_te = fit_geo_features(df, groups, X_train.index, X_test.index)
+        preprocessor.add_geo(geo, f_tr)
+        # linear models cannot take NaN: rows without coordinates get the training median
+        fill = preprocessor.fill_values_
+        X_train = pd.concat([X_train, f_tr.fillna(fill)], axis=1)
+        X_test = pd.concat([X_test, f_te.fillna(fill)], axis=1)
+    if save:
+        preprocessor.save(os.path.join(OUT_DIR, f"{VARIANT}-features.json"))
     return X_train, X_test, y_train, y_test, df_for_lineage
 
 def train_model(X_train, y_train, alpha=1.0):
@@ -118,7 +135,7 @@ def get_shap_values(model, X_train):
     return shap_values
 
 def log_mlflow(model_name, model, X_train, y_train, X_test, y_test, mlflow_name, best_mse,
-               df_for_lineage=None):
+               df_for_lineage=None, multiseed=None):
     with mlflow.start_run(run_name=model_name) as run:
         # Log model parameters
         params = {
@@ -129,6 +146,19 @@ def log_mlflow(model_name, model, X_train, y_train, X_test, y_test, mlflow_name,
         if hasattr(_final_estimator(model), 'alpha'):
             params["alpha"] = _final_estimator(model).alpha
         mlflow.log_params(params)
+        mlflow.log_param("geo_features", USE_GEO)
+        geo_file = os.path.join(OUT_DIR, f"{VARIANT}-geo.json")
+        if USE_GEO and os.path.exists(geo_file):
+            mlflow.log_artifact(geo_file, "preprocessing")
+
+        # The registry serves from this bundle (services/model_sync.py)
+        from services.artifact_bundle import stamp
+        from services.data_cleaning import dataset_id, resolve_dataset_path
+        stamp(OUT_DIR, VARIANT, run.info.run_id, dataset=dataset_id(resolve_dataset_path()))
+        for suffix in ("model.joblib", "features.json", "geo.json"):
+            f = os.path.join(OUT_DIR, f"{VARIANT}-{suffix}")
+            if os.path.exists(f):
+                mlflow.log_artifact(f, "bundle")
 
         # CROSS-VALIDATION EVALUATION
         import sys
@@ -199,6 +229,9 @@ def log_mlflow(model_name, model, X_train, y_train, X_test, y_test, mlflow_name,
         mlflow.log_metric('mae', mae)
         mlflow.log_metric('r2_score', r2)
         mlflow.log_metric('mape', float(mape))
+        if multiseed is not None:  # evidence for the promotion gate (services/multiseed_gate.py)
+            from services import multiseed_gate
+            multiseed_gate.log_metrics(multiseed, mlflow.log_metric)
 
         # Log model and SHAP values only if the model is the best model
         # NB: `best_mse` is the best candidate's RMSE (evaluate_model returns the square root),
@@ -310,6 +343,15 @@ def log_mlflow(model_name, model, X_train, y_train, X_test, y_test, mlflow_name,
             except Exception as e:
                 print(f"Warning: Auto-promotion check failed: {e}")
 
+                # Serve the registry's Production version: installs this run's bundle if it was just promoted
+            # (training only ever writes to OUT_DIR, never over the files the API is serving)
+            try:
+                from services.model_sync import sync_production_models
+                report = sync_production_models(os.path.dirname(__file__))[VARIANT]
+                print(f"Serving: {report['action']}" + (f" ({report['reason']})" if report.get("reason") else ""))
+            except Exception as e:
+                print(f"Warning: could not sync served models: {e}")
+
             # save in bentoml format also
             try:
                 bento_mlflow_uri = mlflow.get_artifact_uri("reg_passed_model")
@@ -347,6 +389,17 @@ if __name__ == "__main__":
     print(f"Best Model: {best_model_name} with test RMSE: {best_mse}")
 
     # Always log to MLflow; the auto-promotion service decides whether it ships
-    log_mlflow(best_model_name, best_model, X_train, y_train, X_test, y_test, mlflow_name="reg_passed_model", best_mse=best_mse, df_for_lineage=df_for_lineage)
-    path = os.path.join(os.path.dirname(__file__), f"{VARIANT}-model.joblib")
-    joblib.dump(best_model, path)
+    multiseed = None
+    if os.getenv("MULTISEED", "1") != "0":
+        from sklearn.base import clone
+        from services import multiseed_gate
+        from services.data_split import groups_for as _groups_for
+
+        def split(s):
+            Xtr, Xte, ytr, yte, df_l = load_data(seed=s, save=False)
+            return Xtr, Xte, ytr, yte, _groups_for(df_l, Xtr)
+
+        multiseed = multiseed_gate.evaluate_seeds(split, lambda: clone(best_model))
+        print(f"Multi-seed ({multiseed['multiseed_n']} splits): RMSE {multiseed['rmse_multiseed']:.2f} ± {multiseed['rmse_multiseed_std']:.2f}")
+    joblib.dump(best_model, os.path.join(OUT_DIR, f"{VARIANT}-model.joblib"))  # logged and stamped inside log_mlflow
+    log_mlflow(best_model_name, best_model, X_train, y_train, X_test, y_test, mlflow_name="reg_passed_model", best_mse=best_mse, df_for_lineage=df_for_lineage, multiseed=multiseed)

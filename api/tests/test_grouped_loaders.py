@@ -32,7 +32,6 @@ def raw_listings():
         "rei_price": rng.uniform(0, 20, n),
         "shikikin": rng.uniform(0, 20, n),
         "maintenence_price": rng.uniform(0, 2, n),
-        "contract_type": 0,
         "year_built": rng.integers(0, 40, n),
         "floor": rng.integers(1, 15, n),
         "nearest_eki_walk": rng.integers(1, 20, n),
@@ -73,10 +72,13 @@ def test_challenger_and_regression_loaders(dataset_csv, raw_listings):
         _assert_grouped(X_tr, X_te, raw_listings[1])
 
 
-def test_ensemble_loader(dataset_csv, raw_listings):
-    from models.ensemble_model import load_data_for_ensemble
-    X_tr, X_te, y_tr, y_te = load_data_for_ensemble()
-    _assert_grouped(X_tr, X_te, raw_listings[1])
+def test_ensemble_folds_hold_out_whole_buildings(dataset_csv, raw_listings):
+    from sklearn.model_selection import GroupKFold
+    from models.ensemble_model import _encoded_frame
+    from services.data_cleaning import load_training_frame
+    X, y, groups = _encoded_frame(load_training_frame())
+    for tr, va in GroupKFold(n_splits=3).split(X, y, groups):
+        _assert_grouped(X.iloc[tr], X.iloc[va], raw_listings[1])
 
 
 @pytest.mark.parametrize("module,cls", [

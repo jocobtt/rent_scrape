@@ -28,11 +28,37 @@ NO_TERMS = os.getenv("NO_TERMS") == "1" or "--no-terms" in sys.argv
 VARIANT = "challenger-noterms" if NO_TERMS else "challenger"
 REGISTERED_NAME = "tokyo_rent_lgbm_noterms" if NO_TERMS else "tokyo_rent_lgbm"
 
+# Training writes its files here, never over the ones the API is serving (models/): the registry decides
+# which run is served (services/model_sync.py), and a candidate that is not promoted must not replace it.
+OUT_DIR = os.getenv("MODEL_OUT_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "staging"))
+os.makedirs(OUT_DIR, exist_ok=True)
+
+# Spatial-lag rent features (nearest buildings' rent per m², town encoding; services/geo_features.py).
+# On by default for the no-terms variant, where location helps most; `--no-geo` / GEO_FEATURES=0 disables.
+USE_GEO = NO_TERMS and os.getenv("GEO_FEATURES", "1") != "0" and "--no-geo" not in sys.argv
+GEO_MASK_FRAC = float(os.getenv("GEO_MASK_FRAC", "0.2"))  # training rows with geo hidden (no-address requests)
+
+# Fit rent per m² and multiply by size (services/per_sqm_model.py): 15-25% lower held-out RMSE than fitting
+# rent directly. `predict` still returns rent, so nothing downstream changes. PER_SQM=0 restores the old target.
+PER_SQM = os.getenv("PER_SQM", "1") != "0"
+PER_SQM_WEIGHT_POWER = float(os.getenv("PER_SQM_WEIGHT_POWER", "2"))
+
+
+def make_model(params):
+    """LightGBM regressor, wrapped to predict rent per m² when PER_SQM is on."""
+    gbm = lgb.LGBMRegressor(**params)
+    if not PER_SQM:
+        return gbm
+    from services.per_sqm_model import PerSqmRegressor
+    return PerSqmRegressor(gbm, weight_power=PER_SQM_WEIGHT_POWER)
+
 # Share of training rows whose deposit / key money is hidden (see mask_optional_terms)
 TERMS_MASK_FRAC = 0.0 if NO_TERMS else float(os.getenv("TERMS_MASK_FRAC", "0.25"))
 
 # load the data
-def load_data(dataset=None):
+def load_data(dataset=None, seed=42, save=True):
+    """Features and a grouped split. `seed` picks the held-out buildings; `save=False` leaves the
+    on-disk preprocessor / geo files alone (multi-seed evaluation)."""
     import sys as _sys
     _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from services.feature_preprocessor import FeaturePreprocessor, mask_optional_terms
@@ -46,14 +72,24 @@ def load_data(dataset=None):
 
     preprocessor = FeaturePreprocessor()
     encoded, _ = preprocessor.fit_transform(df)
-    preprocessor.save(os.path.join(os.path.dirname(__file__), f"{VARIANT}-features.json"))
 
     X = encoded.drop('rent_price', axis=1)
     y = encoded['rent_price']
     # Hold out whole buildings so near-duplicate units can't leak into the test set
     groups = group_labels(df)
-    X_train, X_test, y_train, y_test, _ = grouped_train_test_split(X, y, groups, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test, _ = grouped_train_test_split(X, y, groups, test_size=0.2, random_state=seed)
     df_for_lineage = attach_groups(encoded.copy(), groups)
+    if USE_GEO and groups is not None:
+        from services.geo_features import fit_geo_features, mask_geo_features
+        # Residual lag (unit mix removed) without the density columns: both measured better or equal
+        # (scripts/geo_residual_experiment.py)
+        geo, f_tr, f_te = fit_geo_features(df, groups, X_train.index, X_test.index,
+                                           residual=True, drop_density=True)
+        preprocessor.add_geo(geo, f_tr)
+        X_train, X_test = pd.concat([X_train, f_tr], axis=1), pd.concat([X_test, f_te], axis=1)
+        X_train = mask_geo_features(X_train, GEO_MASK_FRAC)
+    if save:
+        preprocessor.save(os.path.join(OUT_DIR, f"{VARIANT}-features.json"))
     # Mask deposit / key money on a quarter of the training rows (0.25 was the best trade-off: see README) so the model also works when the
     # API request omits them. Test data stays complete; no-terms scores are logged separately.
     X_train = mask_optional_terms(X_train, frac=TERMS_MASK_FRAC)
@@ -91,13 +127,14 @@ def tune_params(X_train, y_train, groups, base_params, n_trials=20, n_folds=3, s
         }
         rmses, iters = [], []
         for tr, va in folds:
-            m = lgb.LGBMRegressor(**p).fit(
+            m = make_model(p).fit(
                 X_train.iloc[tr], y_train.iloc[tr],
                 eval_set=[(X_train.iloc[va], y_train.iloc[va])], eval_metric="l2",
                 callbacks=[lgb.early_stopping(50, verbose=False)],
             )
-            rmses.append(m.best_score_["valid_0"]["l2"] ** 0.5)
-            iters.append(m.best_iteration_)
+            # scored in rent (万円) whatever the training target
+            rmses.append(float(np.sqrt(np.mean((y_train.iloc[va].to_numpy() - m.predict(X_train.iloc[va])) ** 2))))
+            iters.append((m.estimator_ if PER_SQM else m).best_iteration_)
         best_iters[trial.number] = float(np.mean(iters))
         return float(np.mean(rmses))
 
@@ -117,7 +154,7 @@ def train_and_log_model(X_train, X_test, y_train, y_test, params,
     tuning_trials = params.pop("tuning_trials", 0)
     with mlflow.start_run() as run:
         # Initialize model
-        gbm = lgb.LGBMRegressor(**params)
+        gbm = make_model(params)
 
         # CROSS-VALIDATION EVALUATION
         # Import evaluation service
@@ -134,7 +171,7 @@ def train_and_log_model(X_train, X_test, y_train, y_test, params,
         evaluator = ModelEvaluationService(n_folds=5, random_state=42)
 
         # Fit model for CV evaluation (without early stopping for fair comparison)
-        cv_model = lgb.LGBMRegressor(**params)
+        cv_model = make_model(params)
         evaluation_report = evaluator.evaluate_comprehensive(
             cv_model,
             X_train,
@@ -200,14 +237,36 @@ def train_and_log_model(X_train, X_test, y_train, y_test, params,
             mlflow.log_metric("r2_no_terms", nt['r2'])
             mlflow.log_metric("mape_no_terms", float(nt['mape']))
 
+        # Evidence for the promotion gate from several held-out splits (see services/multiseed_gate.py)
+        if os.getenv("MULTISEED", "1") != "0" and dataset_source_path:
+            from services import multiseed_gate
+
+            def split(s):
+                Xtr, Xte, ytr, yte, df_l = load_data(dataset_source_path, seed=s, save=False)
+                return Xtr, Xte, ytr, yte, groups_for(df_l, Xtr)
+
+            ms = multiseed_gate.evaluate_seeds(split, lambda: make_model(params))
+            multiseed_gate.log_metrics(ms, mlflow.log_metric)
+            print(f"Multi-seed ({ms['multiseed_n']} splits): RMSE {ms['rmse_multiseed']:.2f} ± {ms['rmse_multiseed_std']:.2f}")
+
         # Log model
-        mlflow.lightgbm.log_model(model, "lgbm_model")
+        if PER_SQM:  # the wrapper (rent out), not the bare booster (rent per m² out)
+            mlflow.sklearn.log_model(model, "lgbm_model")
+        else:
+            mlflow.lightgbm.log_model(model, "lgbm_model")
 
         # Log parameters
         mlflow.log_params(params)
         mlflow.log_param("tuning_trials", tuning_trials)
         mlflow.log_param("terms_mask_frac", TERMS_MASK_FRAC)
         mlflow.log_param("variant", VARIANT)
+        mlflow.log_param("geo_features", USE_GEO)
+        mlflow.log_param("per_sqm_target", PER_SQM)
+        if PER_SQM:
+            mlflow.log_param("per_sqm_weight_power", PER_SQM_WEIGHT_POWER)
+        geo_file = os.path.join(OUT_DIR, f"{VARIANT}-geo.json")
+        if USE_GEO and os.path.exists(geo_file):
+            mlflow.log_artifact(geo_file, "preprocessing")
 
         # Log all metrics
         mlflow.log_metric("mse", mse)
@@ -238,7 +297,7 @@ def train_and_log_model(X_train, X_test, y_train, y_test, params,
 
         # Log SHAP-based global feature importance
         try:
-            explainer = shap.TreeExplainer(model)
+            explainer = shap.TreeExplainer(model.estimator_ if PER_SQM else model)  # ranks features in the model's own target units
             sample = X_train.iloc[:min(200, len(X_train))]
             shap_values = explainer.shap_values(sample)
             mean_abs_shap = np.abs(shap_values).mean(axis=0)
@@ -257,7 +316,16 @@ def train_and_log_model(X_train, X_test, y_train, y_test, params,
             print(f"SHAP logging skipped: {e}")
 
         # Save model locally
-        joblib.dump(model, os.path.join(os.path.dirname(__file__), f"{VARIANT}-model.joblib"))
+        joblib.dump(model, os.path.join(OUT_DIR, f"{VARIANT}-model.joblib"))
+        from services.artifact_bundle import stamp
+        from services.data_cleaning import dataset_id
+        run_id = run.info.run_id
+        stamp(OUT_DIR, VARIANT, run_id, dataset=dataset_id(dataset_source_path) if dataset_source_path else None)  # model / features / geo state now belong together
+        # The registry serves from this: services/model_sync.py downloads the Production run's bundle
+        for suffix in ("model.joblib", "features.json", "geo.json"):
+            f = os.path.join(OUT_DIR, f"{VARIANT}-{suffix}")
+            if os.path.exists(f):
+                mlflow.log_artifact(f, "bundle")
 
         run_id = run.info.run_id
 
@@ -320,6 +388,15 @@ def train_and_log_model(X_train, X_test, y_train, y_test, params,
         except Exception as e:
             print(f"Warning: Auto-promotion check failed: {e}")
 
+        # Serve the registry's Production version: installs this run's bundle if it was just promoted
+        # (training only ever writes to OUT_DIR, never over the files the API is serving)
+        try:
+            from services.model_sync import sync_production_models
+            report = sync_production_models(os.path.dirname(__file__))[VARIANT]
+            print(f"Serving: {report['action']}" + (f" ({report['reason']})" if report.get("reason") else ""))
+        except Exception as e:
+            print(f"Warning: could not sync served models: {e}")
+
         # save in bentoml format also
         try:
             bento_model = bentoml.mlflow.import_model(
@@ -353,6 +430,10 @@ if __name__ == '__main__':
     # Tuning budget: same as the PyTorch models (20 Optuna trials). LGBM_N_TRIALS=0 uses the
     # hand-set params above.
     n_trials = int(os.getenv("LGBM_N_TRIALS", "20"))
+    if os.getenv("LGBM_PARAMS_FROM_PRODUCTION") == "1":  # replay the registered Production hyperparameters
+        from scripts.multiseed_eval import lgbm_params
+        params = {**lgbm_params(REGISTERED_NAME), "task": "train", "boosting_type": "gbdt", "metric": ["l1", "l2"]}
+        n_trials = 0
     if n_trials > 0:
         from services.data_split import groups_for
         params, tuned_cv_rmse = tune_params(X_train, y_train, groups_for(df_for_lineage, X_train),

@@ -4,8 +4,10 @@ from fastapi.testclient import TestClient
 import os
 
 os.environ.setdefault("ADMIN_API_KEY", "test-admin-key")
+os.environ.setdefault("MODEL_SYNC", "0")  # no registry in tests; individual tests opt in
 
 import model_api
+from app_state import S
 
 
 @pytest.fixture(scope="session")
@@ -42,7 +44,7 @@ def mock_prediction_svc(monkeypatch):
         "challenger_prediction": 13.0,
         "difference": 0.5,
     }
-    monkeypatch.setattr(model_api, "prediction_service", svc)
+    monkeypatch.setattr(S, "prediction_service", svc)
     return svc
 
 
@@ -51,8 +53,8 @@ def no_models(monkeypatch):
     """Force all model-dependent services to None so 503 paths are reachable
     regardless of whether .joblib files are present on the local machine."""
     # Null out module-level service globals
-    monkeypatch.setattr(model_api, "prediction_service", None)
-    monkeypatch.setattr(model_api, "ensemble_prediction_service", None)
+    monkeypatch.setattr(S, "prediction_service", None)
+    monkeypatch.setattr(S, "ensemble_prediction_service", None)
 
     # Null out app.state so the middleware won't re-initialize the services
     prev_challenger = getattr(model_api.app.state, "challenger_model", _MISSING)

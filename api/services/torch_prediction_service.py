@@ -392,6 +392,9 @@ class PyTorchPredictionService(PredictionService):
         
         for name, model in self.torch_models.items():
             try:
+                if hasattr(model, "describe"):  # bundles served by services/tabular_models.py
+                    model_info[name] = model.describe()
+                    continue
                 info = {
                     "name": name,
                     "type": getattr(model, 'model_type', 'unknown'),
