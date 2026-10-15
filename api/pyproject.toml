@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"  # Use Python 3.9 for better compatibility
 dependencies = [
-    "numpy>=1.20.0,<2.0.0",
+    "numpy>=1.20.0,<3.0.0",
     "pandas",
     "scikit-learn",
     "mlflow",
