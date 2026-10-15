@@ -70,6 +70,16 @@ export function compareToTypical(market, ward, layout, sqrM, rent) {
   };
 }
 
+/**
+ * What the deposit usually is for this flat. Deposit equals one month's rent in 83% of 港区 2LDK
+ * listings (and the models lean on it heavily), so the typical rent for the size is a good guide.
+ * @returns {number|null} 万円
+ */
+export function typicalDeposit(market, ward, layout, sqrM) {
+  const typical = compareToTypical(market, ward, layout, sqrM, 0);
+  return typical ? Math.round(typical.typicalRent) : null;
+}
+
 /** [low, high] around a prediction, never below zero. */
 export function estimateRange(rent, hasStation) {
   const err = hasStation ? TYPICAL_ERROR.withStation : TYPICAL_ERROR.wardOnly;

@@ -6,6 +6,7 @@ import useModelAvailability from '../hooks/useModelAvailability';
 import useMarketData from '../hooks/useMarketData';
 import { trackEvent } from '../lib/posthog';
 import { buildRentInput } from '../lib/rentForm';
+import { typicalDeposit } from '../lib/market';
 import RentFormFields from '../components/RentFormFields';
 import { NumberField } from '../components/FormFields';
 import GuidedInputs from '../components/model/GuidedInputs';
@@ -17,6 +18,10 @@ import './Compare.css';
 
 // Deep models, fastest first; each is requested on its own so a row appears when it is ready
 const DEEP_MODELS = ['tokyo_rent_tabnet', 'tokyo_rent_tabpfn'];
+
+// Below this share of the usual deposit the entry is probably a typo (万円 vs 円), and the deposit
+// drives every model that takes it, so they will disagree for a reason that is not the models'
+const LOW_DEPOSIT_SHARE = 0.4;
 
 const settled = (res) => (res.status === 'fulfilled' ? res.value.data : null);
 
@@ -31,6 +36,13 @@ const Compare = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState(null); // { full, compare, confidence, recommendations, partial, pending }
   const runRef = useRef(0); // which submit the in-flight responses belong to
+
+  const usualDeposit = guided ? typicalDeposit(market.data, values.kuName, values.apartmentType, parseFloat(values.sqrM)) : null;
+  const depositEntered = values.shikikin !== '' ? parseFloat(values.shikikin) : null;
+  const depositHint = usualDeposit && (
+    depositEntered !== null && depositEntered < usualDeposit * LOW_DEPOSIT_SHARE
+      ? `Well below the usual deposit of about ${usualDeposit}万円 here (often one month's rent). The models lean on it, so they may disagree.`
+      : `Usually about ${usualDeposit}万円 here, often one month's rent.`);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -153,7 +165,8 @@ const Compare = () => {
                     <NumberField
                       id="c-shikikin" label="Security Deposit 敷金 (万円):"
                       value={values.shikikin} onChange={onChange('shikikin')} error={errors.shikikin}
-                      placeholder="e.g. 2" min="0" max="100" step="0.5"
+                      placeholder={usualDeposit ? String(usualDeposit) : 'e.g. 2'} hint={depositHint || undefined}
+                      min="0" max="100" step="0.5"
                     />
                   </div>
                 </fieldset>
